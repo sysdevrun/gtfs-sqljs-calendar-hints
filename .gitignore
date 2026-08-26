@@ -1,0 +1,4 @@
+node_modules/
+feeds/
+gtfs/
+*.zip
