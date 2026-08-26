@@ -284,7 +284,10 @@ export default function App() {
               ) : (
                 <>
                   API injoignable ({calendar.error}) — extrait embarqué du dépôt,
-                  limité à {zoneLocations.length > 0 ? calendar.zones.map(z => z.zone).join(' et ') : 'quelques zones'}.
+                  limité à {calendar.zones.map(z => z.zone).join(' et ')}.{' '}
+                  <button className="link-button" onClick={() => void loadCalendar()} disabled={calendarLoading}>
+                    {calendarLoading ? 'Téléchargement…' : 'Réessayer'}
+                  </button>
                 </>
               )}
             </p>
