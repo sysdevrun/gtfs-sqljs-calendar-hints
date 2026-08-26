@@ -1,0 +1,30 @@
+{
+  "name": "gtfs-calendar-hints-website",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "copy-wasm": "node scripts/copy-wasm.mjs",
+    "predev": "npm run copy-wasm",
+    "dev": "vite",
+    "prebuild": "npm run copy-wasm",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "comlink": "^4.4.2",
+    "gtfs-sqljs": "^0.8.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-gtfs-selector": "^0.5.0",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/sql.js": "^1.4.9",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.1"
+  }
+}

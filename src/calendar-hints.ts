@@ -118,8 +118,7 @@ export interface CalendarHintsResult {
 // ---------------------------------------------------------------------------
 // Dates (ISO YYYY-MM-DD, computed in UTC) and hashing
 // ---------------------------------------------------------------------------
-const WEEKDAY_COLUMNS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
-const WEEKDAY_NAMES = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays']
+const WEEKDAY_NAMES =['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays']
 const MONDAY_TO_SUNDAY = [1, 2, 3, 4, 5, 6, 0]
 
 const gtfsDateToIso = (d: string) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`

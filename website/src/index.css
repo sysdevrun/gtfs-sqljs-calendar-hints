@@ -1,0 +1,330 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f3f4f6;
+  color: #111827;
+  line-height: 1.5;
+}
+
+.app {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.app-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+}
+
+.app-header p {
+  margin: 0 0 1rem;
+  color: #374151;
+  max-width: 72ch;
+}
+
+a {
+  color: #2563eb;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.card h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+code {
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 0 0.25rem;
+  font-size: 0.9em;
+}
+
+/* --- Presets ------------------------------------------------------------ */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.preset-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.preset-button:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.preset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preset-name {
+  font-weight: 600;
+}
+
+.preset-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* --- Paramètres --------------------------------------------------------- */
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  align-items: flex-end;
+}
+
+.settings-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.settings-row select,
+.settings-row input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.analyze-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.analyze-button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.analyze-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* --- Statut / erreurs --------------------------------------------------- */
+.progress-track {
+  height: 10px;
+  border-radius: 5px;
+  background: #e5e7eb;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.2s;
+}
+
+.card.error {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.card.error h2 {
+  color: #b91c1c;
+}
+
+/* --- Hints générés ------------------------------------------------------ */
+.link-button {
+  border: none;
+  background: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.95rem;
+}
+
+.hints-detail ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.4rem;
+  columns: 2;
+}
+
+@media (max-width: 700px) {
+  .hints-detail ul {
+    columns: 1;
+  }
+}
+
+/* --- Résultats des hints ------------------------------------------------ */
+.hint-result {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.hint-result.hint-matched {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.hint-result.hint-failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.hint-result-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.3rem;
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  white-space: nowrap;
+}
+
+.badge-ok {
+  background: #16a34a;
+  color: #fff;
+}
+
+.badge-ko {
+  background: #dc2626;
+  color: #fff;
+}
+
+.badge-neutral {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.hint-group {
+  margin: 0.35rem 0;
+}
+
+.hint-mismatch {
+  margin: 0.35rem 0;
+  color: #b91c1c;
+  overflow-wrap: anywhere;
+}
+
+/* --- Périodes ----------------------------------------------------------- */
+.period-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.period-card {
+  border: 1px solid #e5e7eb;
+  border-left: 6px solid #2563eb;
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+}
+
+.period-labels {
+  font-weight: 600;
+}
+
+/* --- Calendrier --------------------------------------------------------- */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+}
+
+.calendar-month-title {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  text-transform: capitalize;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-day-header {
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  color: #fff;
+  font-weight: 600;
+  cursor: default;
+}
+
+.calendar-day-empty {
+  background: transparent;
+}
+
+.calendar-day-unclassified {
+  color: #111827;
+  background: repeating-linear-gradient(
+    45deg,
+    #e5e7eb,
+    #e5e7eb 3px,
+    #fca5a5 3px,
+    #fca5a5 6px
+  );
+}
