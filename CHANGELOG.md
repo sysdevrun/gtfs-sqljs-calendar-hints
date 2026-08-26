@@ -2,6 +2,18 @@
 
 ## Upcoming release
 
+## 0.2.0
+
+- Reusable analyzer: `createCalendarAnalyzer(gtfs, options)` loads the feed
+  once and returns a `CalendarAnalyzer` whose `analyze(hints)` is pure
+  in-memory computation, so trying several hint sets costs milliseconds
+  instead of re-reading trips and stop_times every time. `findCalendarPeriods`
+  now delegates to it (identical results).
+- Optional raw-SQL fast path (`fastPath` option, default true): when the
+  source exposes a gtfs-sqljs adapter database on `db` (as `GtfsSqlJs`
+  instances do), a few read-only SQL queries replace the row-by-row `getXXXX`
+  calls with identical results — ~×6 on Astuce (Rouen). Any failure falls
+  back to the portable path; `fastPath: false` forces the portable path.
 - Custom hint attributes. `findCalendarPeriods` and `CalendarAnalyzer.analyze`
   are now generic (`H extends Hint`): hints may carry arbitrary extra
   attributes, preserved by reference in the results (no copies) and typed all
