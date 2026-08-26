@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { GtfsSqlJs } from 'gtfs-sqljs'
 import { createSqlJsAdapter } from 'gtfs-sqljs/adapters/sql-js'
-import { findCalendarPeriods, weekdayOf, type CalendarHintsResult, type Hint, type SignatureMode } from './calendar-hints'
+import { findCalendarPeriods, weekdayOf, type CalendarHintsResult, type Hint, type SignatureMode } from '../src/calendar-hints'
 import { NETWORKS, publicHolidays, schoolVacationDays, schoolVacationRanges } from './hints-france'
 
 const WEEKDAY_NAMES_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']

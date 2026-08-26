@@ -1,4 +1,4 @@
-# gtfs-calendar-hints — exploration
+# gtfs-sqljs-calendar-hints
 
 Détecter les **périodes de service** d'un calendrier GTFS (« Lundi à vendredi
 période scolaire », « Lundi à vendredi vacances et tous les samedis »,
@@ -6,6 +6,13 @@ période scolaire », « Lundi à vendredi vacances et tous les samedis »,
 l'utilisateur, avec un matching **strictement exact** : aucun seuil, aucun
 « à peu près ». Si le GTFS ne colle pas au hint, le hint échoue et on explique
 pourquoi avec des jours concrets.
+
+```bash
+npm install gtfs-sqljs-calendar-hints
+```
+
+Zéro dépendance ; conçu pour [gtfs-sqljs](https://www.npmjs.com/package/gtfs-sqljs)
+(typage structurel : toute source implémentant 5 méthodes `getXXXX` convient).
 
 ## Démo en ligne
 
@@ -80,7 +87,7 @@ stub de test fonctionne aussi.
 La librairie n'a **aucune dépendance** : les jours fériés et les vacances
 scolaires sont fournis par l'appelant, sous forme de listes de dates ISO dans
 les `days` des hints. Voir « Générer les jours des hints » ci-dessous pour
-les sources recommandées, et `src/hints-france.ts` pour un générateur
+les sources recommandées, et `examples/hints-france.ts` pour un générateur
 d'exemple (utilisé par les runners de ce dépôt).
 
 | Besoin de l'algorithme | Méthode gtfs-sqljs |
@@ -103,14 +110,14 @@ Constats de l'évaluation :
   stop_times) 189 ms / 2,3 s — le mode contenu est dominé par les
   `getStopTimes` par lots.
 - Validation croisée : les deux implémentations (lecture CSV directe
-  `src/run.ts` et gtfs-sqljs `src/run-gtfs-sqljs.ts`) produisent des
+  `examples/run.ts` et gtfs-sqljs `examples/run-gtfs-sqljs.ts`) produisent des
   résultats identiques sur les 5 réseaux (mêmes signatures, mêmes groupes,
   mêmes jours non classés).
 
 ```typescript
 import { GtfsSqlJs } from 'gtfs-sqljs'
 import { createSqlJsAdapter } from 'gtfs-sqljs/adapters/sql-js'
-import { findCalendarPeriods } from './src/calendar-hints'
+import { findCalendarPeriods } from 'gtfs-sqljs-calendar-hints'
 
 const gtfs = await GtfsSqlJs.fromZip('https://example.com/gtfs.zip', {
   adapter: await createSqlJsAdapter(),
@@ -212,25 +219,30 @@ construire les listes de dates. Sources recommandées pour la France :
   (académies « Réunion », « Normandie »…). Garder `population` ∈
   {`-`, `Élèves`}. Conventions : voir edge cases 10-13.
 
-`src/hints-france.ts` implémente ces deux générateurs (exemple, hors
+`examples/hints-france.ts` implémente ces deux générateurs (exemple, hors
 librairie — `date-holidays` est une devDependency de ce dépôt, pas une
-dépendance de `calendar-hints.ts`).
+dépendance du paquet).
 
 ## Scripts
 
 ```bash
-npx tsx src/run.ts car-jaune kar-ouest carsud estival astuce
+npm run build       # tsup → dist/ (ESM + .d.ts)
+npm test            # vitest, sur un stub GtfsCalendarSource
+npm run lint && npm run typecheck
+
+npx tsx examples/run.ts car-jaune kar-ouest carsud estival astuce
   # lecture CSV directe ; chaque réseau passe en trip-ids puis trip-content
-npx tsx src/run-gtfs-sqljs.ts car-jaune estival …
+npx tsx examples/run-gtfs-sqljs.ts car-jaune estival …
   # même chose via gtfs-sqljs (méthodes getXXXX uniquement)
-npx tsx src/compare-services.ts <dir>   # services au contenu identique ?
+npx tsx examples/compare-services.ts <dir>   # services au contenu identique ?
 ```
 
-- `src/calendar-hints.ts` : **la librairie** — algorithme sur gtfs-sqljs,
-  résultats structurés, sans affichage.
-- `src/lib.ts` : implémentation d'exploration en lecture CSV directe.
-- `src/hints-france.ts` : fériés (date-holidays) et vacances scolaires (API
-  éducation nationale) par réseau.
-- `src/run.ts` / `src/run-gtfs-sqljs.ts` : runners des deux voies.
-- `src/csv.ts` : parseur CSV streaming (BOM, quotes, CRLF).
+- `src/calendar-hints.ts` (+ `src/index.ts`) : **le paquet npm** — algorithme
+  sur gtfs-sqljs, résultats structurés, sans affichage, zéro dépendance.
+- `examples/lib.ts` : implémentation d'exploration en lecture CSV directe.
+- `examples/hints-france.ts` : fériés (date-holidays) et vacances scolaires
+  (API éducation nationale) par réseau.
+- `examples/run.ts` / `examples/run-gtfs-sqljs.ts` : runners des deux voies.
+- `examples/csv.ts` : parseur CSV streaming (BOM, quotes, CRLF).
 - `data/school-calendar.json` : extrait de l'API calendrier scolaire.
+- `website/` : démo React (GitHub Pages).

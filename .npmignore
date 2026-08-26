@@ -1,0 +1,33 @@
+# Source files
+src/
+tests/
+examples/
+website/
+feeds/
+gtfs/
+data/
+*.test.ts
+
+# Config files
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+eslint.config.js
+
+# CI/CD
+.github/
+
+# Development
+node_modules/
+coverage/
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Misc
+*.log
+.DS_Store
+*.zip
