@@ -7,6 +7,15 @@ l'utilisateur, avec un matching **strictement exact** : aucun seuil, aucun
 « à peu près ». Si le GTFS ne colle pas au hint, le hint échoue et on explique
 pourquoi avec des jours concrets.
 
+## Démo en ligne
+
+Le répertoire [`website/`](website/) contient un site React (Vite) qui fait
+tourner la librairie dans le navigateur : sélection d'un GTFS
+(react-gtfs-selector + proxy CORS SysDevRun), boutons 1-clic pour Car Jaune,
+Kar'Ouest, Citalis, Estival, CarSud et Astuce (Rouen), génération automatique
+des hints et visualisation des périodes détectées. Déployé sur GitHub Pages :
+<https://sysdevrun.github.io/gtfs-sqljs-calendars-hints/>
+
 ## Entrées
 
 - Un GTFS (répertoire de `.txt` dézippés).

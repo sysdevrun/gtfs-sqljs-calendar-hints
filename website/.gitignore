@@ -1,0 +1,4 @@
+node_modules
+dist
+public/sql-wasm.wasm
+public/sql-wasm-browser.wasm
