@@ -1,9 +1,9 @@
 // Génération des hints côté navigateur : jours fériés français calculés
-// localement (computus), vacances scolaires depuis l'API
-// data.education.gouv.fr avec repli sur l'extrait embarqué du dépôt.
+// localement (computus), vacances scolaires issues du calendrier officiel
+// chargé par `school-calendar.ts`.
 import type { Hint, Policy } from '../../src/calendar-hints'
-import type { Academy, HolidayZone } from './presets'
-import schoolCalendarFallback from '../../data/school-calendar.json'
+import type { HolidayZone } from './presets'
+import type { SchoolCalendarRecord } from './school-calendar'
 
 export const weekdayOf = (iso: string) => new Date(iso + 'T00:00:00Z').getUTCDay()
 
@@ -74,57 +74,32 @@ export function publicHolidays(zone: HolidayZone, firstDay: string, lastDay: str
 }
 
 // ---------------------------------------------------------------------------
-// Vacances scolaires : API data.education.gouv.fr (fr-en-calendrier-scolaire)
+// Vacances scolaires (dataset fr-en-calendrier-scolaire, cf. school-calendar.ts)
 // Convention du jeu de données : start_date = dernier jour de classe,
 // end_date = dernier jour de vacances (reprise le lendemain matin).
 // ---------------------------------------------------------------------------
-interface SchoolCalendarRecord {
-  description: string
-  population: string
-  start_date: string
-  end_date: string
-  location: string
-  annee_scolaire: string
-}
-
-const API_URL = 'https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records'
-
-const recordsCache = new Map<string, SchoolCalendarRecord[]>()
-
-async function fetchSchoolCalendar(academy: Academy): Promise<SchoolCalendarRecord[]> {
-  const cached = recordsCache.get(academy)
-  if (cached) return cached
-  let records: SchoolCalendarRecord[]
-  try {
-    const params = new URLSearchParams({
-      select: 'description,population,start_date,end_date,location,annee_scolaire',
-      where: `location="${academy}"`,
-      limit: '100',
-    })
-    const res = await fetch(`${API_URL}?${params}`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = (await res.json()) as { results: SchoolCalendarRecord[] }
-    records = data.results
-  } catch {
-    // Hors-ligne ou API indisponible : extrait embarqué (2025-2027)
-    records = (schoolCalendarFallback as { results: SchoolCalendarRecord[] }).results
-  }
-  const filtered = records.filter(r => r.location === academy)
-  recordsCache.set(academy, filtered)
-  return filtered
-}
-
 export interface VacationRange {
   label: string
   first: string
   last: string
 }
 
-export async function schoolVacationRanges(academy: Academy, firstDay: string, lastDay: string): Promise<VacationRange[]> {
+// Les grandes vacances sont publiées en double, « Élèves » et « Enseignants »,
+// à un jour d'écart : seule la version élèves nous intéresse. Le champ
+// `population` sert aussi à distinguer des territoires (Guadeloupe :
+// « Saint-Martin », « Saint-Barthélémy »…) ou des degrés (Polynésie) — ces
+// valeurs-là sont conservées, d'où l'exclusion ciblée plutôt qu'une liste
+// blanche `{-, Élèves}`.
+const isTeachersOnly = (population: string) => /enseignants/i.test(population)
+
+export function schoolVacationRanges(
+  records: SchoolCalendarRecord[],
+  firstDay: string,
+  lastDay: string,
+): VacationRange[] {
   const sundayAfter = (d: string) => addDays(d, (7 - weekdayOf(d)) % 7)
-  const records = await fetchSchoolCalendar(academy)
   return records
-    .filter(r => r.population === '-' || r.population === 'Élèves')
+    .filter(r => !isTeachersOnly(r.population))
     .map(r => {
       const start = r.start_date.slice(0, 10)
       const end = r.end_date.slice(0, 10)
@@ -201,15 +176,15 @@ export interface GeneratedHints {
   hints: Hint[]
 }
 
-export async function generateHints(
+export function generateHints(
   zone: HolidayZone,
-  academy: Academy,
+  schoolRecords: SchoolCalendarRecord[],
   firstDay: string,
   lastDay: string,
   configs: HintConfig[] = DEFAULT_HINT_CONFIGS,
-): Promise<GeneratedHints> {
+): GeneratedHints {
   const holidays = publicHolidays(zone, firstDay, lastDay)
-  const vacationRanges = await schoolVacationRanges(academy, firstDay, lastDay)
+  const vacationRanges = schoolVacationRanges(schoolRecords, firstDay, lastDay)
   const daysOf = (c: HintConfig): string[] => {
     if (c.source === 'holidays') return holidays.map(h => h.date)
     if (c.source === 'school-vacations') return vacationDaysOf(vacationRanges)

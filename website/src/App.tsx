@@ -13,6 +13,13 @@ import type { GtfsWorkerAPI, ProgressInfo, FeedSummary } from './gtfs.worker'
 import { proxyUrl } from './proxy'
 import { PRESETS, type Academy, type HolidayZone, type NetworkPreset } from './presets'
 import { generateHints, DEFAULT_HINT_CONFIGS, type GeneratedHints, type HintConfig } from './hints'
+import {
+  loadSchoolCalendar,
+  recordsForLocation,
+  zoneOfLocation,
+  DATASET_URL,
+  type SchoolCalendar,
+} from './school-calendar'
 import ResultsView from './components/ResultsView'
 import HintsView from './components/HintsView'
 import HintsEditor from './components/HintsEditor'
@@ -56,7 +63,20 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [calendar, setCalendar] = useState<SchoolCalendar | null>(null)
+  const [calendarLoading, setCalendarLoading] = useState(false)
   const summaryRef = useRef<{ label: string; summary: FeedSummary } | null>(null)
+
+  // `loadSchoolCalendar` garde l'export en cache : le bouton ne fait que
+  // déclencher explicitement ce que l'analyse ferait de toute façon.
+  const loadCalendar = useCallback(async () => {
+    setCalendarLoading(true)
+    try {
+      setCalendar(await loadSchoolCalendar())
+    } finally {
+      setCalendarLoading(false)
+    }
+  }, [])
 
   const getWorker = useCallback(() => {
     if (!workerRef.current) {
@@ -81,7 +101,15 @@ export default function App() {
       // Première passe légère pour connaître la plage du feed…
       const probe = await worker.analyze([], { signatureMode: 'trip-ids', ...clip })
       // …qui permet de générer les hints (fériés + vacances scolaires)…
-      const generated = await generateHints(s.zone, s.academy, probe.firstDay, probe.lastDay, s.hintConfigs)
+      const schoolCalendar = await loadSchoolCalendar()
+      setCalendar(schoolCalendar)
+      const generated = generateHints(
+        s.zone,
+        recordsForLocation(schoolCalendar, s.academy),
+        probe.firstDay,
+        probe.lastDay,
+        s.hintConfigs,
+      )
       // …puis l'analyse complète dans le mode choisi.
       const result = await worker.analyze(generated.hints, { signatureMode: s.mode, ...clip })
       setAnalysis({ result, generated, mode: s.mode, durationMs: performance.now() - started })
@@ -151,6 +179,15 @@ export default function App() {
     return Math.round(phase.progress.percentComplete)
   }, [phase])
 
+  // La zone n'est pas un réglage à part : elle se déduit de l'académie choisie,
+  // et la choisir revient à sélectionner la première académie qu'elle couvre.
+  const schoolZone = calendar ? zoneOfLocation(calendar, settings.academy) ?? '' : ''
+  const zoneLocations = calendar?.zones.find(z => z.zone === schoolZone)?.locations ?? []
+  const selectSchoolZone = useCallback((zone: string) => {
+    const first = calendar?.zones.find(z => z.zone === zone)?.locations[0]
+    if (first) updateSetting('academy', first)
+  }, [calendar, updateSetting])
+
   return (
     <div className="app">
       <header className="app-header">
@@ -198,14 +235,6 @@ export default function App() {
             </select>
           </label>
           <label>
-            Académie (vacances scolaires)
-            <select value={settings.academy} disabled={busy}
-              onChange={e => updateSetting('academy', e.target.value as Academy)}>
-              <option value="Réunion">Réunion</option>
-              <option value="Normandie">Normandie</option>
-            </select>
-          </label>
-          <label>
             Mode d'égalité
             <select value={settings.mode} disabled={busy}
               onChange={e => updateSetting('mode', e.target.value as SignatureMode)}>
@@ -224,6 +253,71 @@ export default function App() {
               onChange={e => updateSetting('lastDay', e.target.value)} />
           </label>
         </div>
+        <h3>Vacances scolaires</h3>
+        {!calendar ? (
+          <div className="school-calendar">
+            <p className="muted">
+              Calendrier officiel{' '}
+              <a href={DATASET_URL} target="_blank" rel="noreferrer">fr-en-calendrier-scolaire</a>{' '}
+              (data.education.gouv.fr) : les trois zones de métropole, la Corse et l'outre-mer,
+              avec toutes leurs académies. Environ 550 ko téléchargés depuis l'API — elle
+              autorise le CORS, aucun proxy n'est nécessaire.
+            </p>
+            <button
+              className="hint-config-add"
+              disabled={calendarLoading}
+              onClick={() => void loadCalendar()}
+            >
+              {calendarLoading ? 'Téléchargement…' : 'Charger le calendrier scolaire'}
+            </button>
+          </div>
+        ) : (
+          <div className="school-calendar">
+            <p className="muted">
+              {calendar.source === 'api' ? (
+                <>
+                  <a href={DATASET_URL} target="_blank" rel="noreferrer">fr-en-calendrier-scolaire</a>{' '}
+                  — {calendar.zones.length} zones,{' '}
+                  {calendar.records.length.toLocaleString('fr-FR')} périodes,{' '}
+                  {calendar.schoolYears[0]} → {calendar.schoolYears[calendar.schoolYears.length - 1]}.
+                </>
+              ) : (
+                <>
+                  API injoignable ({calendar.error}) — extrait embarqué du dépôt,
+                  limité à {zoneLocations.length > 0 ? calendar.zones.map(z => z.zone).join(' et ') : 'quelques zones'}.
+                </>
+              )}
+            </p>
+            <div className="settings-row">
+              <label>
+                Zone
+                <select value={schoolZone} disabled={busy}
+                  onChange={e => selectSchoolZone(e.target.value)}>
+                  {schoolZone === '' && <option value="">— académie hors calendrier —</option>}
+                  {calendar.zones.map(z => (
+                    <option key={z.zone} value={z.zone}>
+                      {z.zone}{z.locations.length > 1 ? ` (${z.locations.length} académies)` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Académie
+                <select value={settings.academy} disabled={busy || zoneLocations.length <= 1}
+                  onChange={e => updateSetting('academy', e.target.value as Academy)}>
+                  {zoneLocations.length === 0 && <option value={settings.academy}>{settings.academy}</option>}
+                  {zoneLocations.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="small muted">
+              Toutes les académies d'une même zone partagent les mêmes dates — le choix
+              ne change que l'étiquette, sauf pour les zones ultramarines qui ont leur
+              propre calendrier.
+            </p>
+          </div>
+        )}
+
         <h3>Hints</h3>
         <HintsEditor
           configs={settings.hintConfigs}

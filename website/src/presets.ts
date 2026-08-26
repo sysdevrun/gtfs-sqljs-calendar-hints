@@ -1,7 +1,9 @@
 // Réseaux prêts à charger en un clic. Les URLs GTFS proviennent des points
 // d'accès officiels (transport.data.gouv.fr / Pysae / Cityway).
 export type HolidayZone = 'metropole' | 'reunion'
-export type Academy = 'Réunion' | 'Normandie'
+/** `location` du dataset fr-en-calendrier-scolaire : « Réunion », « Normandie »,
+ *  « Rennes », « Créteil »… La liste réelle vient du fichier téléchargé. */
+export type Academy = string
 
 export interface NetworkPreset {
   id: string

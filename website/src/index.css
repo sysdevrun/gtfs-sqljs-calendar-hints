@@ -158,6 +158,15 @@ code {
   margin-top: 0.75rem;
 }
 
+/* --- Calendrier scolaire ------------------------------------------------- */
+.school-calendar p {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.school-calendar .settings-row {
+  margin: 0.5rem 0;
+}
+
 /* --- Éditeur de hints ---------------------------------------------------- */
 .hints-editor p {
   margin: 0.25rem 0 0.5rem;

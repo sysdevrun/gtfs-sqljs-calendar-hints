@@ -246,10 +246,22 @@ construire les listes de dates. Sources recommandées pour la France :
   métropole, `new Holidays('FR', 'RE')` pour La Réunion (inclut l'Abolition
   de l'esclavage le 20/12). Filtrer `type === 'public'` (exclut Pentecôte
   dimanche, Fête des Mères…).
-- **Vacances scolaires** : API
-  `data.education.gouv.fr` / dataset `fr-en-calendrier-scolaire`
-  (académies « Réunion », « Normandie »…). Garder `population` ∈
-  {`-`, `Élèves`}. Conventions : voir edge cases 10-13.
+- **Vacances scolaires** : API `data.education.gouv.fr` / dataset
+  `fr-en-calendrier-scolaire`.
+  [Description du jeu de données](https://data.education.gouv.fr/explore/assets/fr-en-calendrier-scolaire/)
+  · export complet (~550 ko, 2406 enregistrements) :
+  <https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/exports/json/>
+
+  Le champ `zones` couvre 13 valeurs : `Zone A`, `Zone B`, `Zone C`,
+  `Réunion`, `Corse`, `Guadeloupe`, `Guyane`, `Martinique`, `Mayotte`,
+  `Saint Pierre et Miquelon`, `Nouvelle Calédonie`, `Polynésie`,
+  `Wallis et Futuna` — de 2017-2018 à 2026-2027 (avant, seule la Corse est
+  renseignée). Les zones métropolitaines sont **dupliquées par académie**
+  (`location` = `Rennes`, `Nantes`, `Lyon`…, mêmes dates dans une zone) : il
+  faut filtrer sur une académie, sinon chaque période remonte 5 à 13 fois.
+  La Réunion n'a qu'une `location`, `Réunion`. Garder `population` ∈
+  {`-`, `Élèves`} (les grandes vacances sont dédoublées Élèves/Enseignants,
+  un jour d'écart). Conventions de dates : voir edge cases 10-13.
 
 `examples/hints-france.ts` implémente ces deux générateurs (exemple, hors
 librairie — `date-holidays` est une devDependency de ce dépôt, pas une
