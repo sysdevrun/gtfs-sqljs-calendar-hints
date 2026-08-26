@@ -9,9 +9,11 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
-    "date-holidays": "^3.36.0"
+    "date-holidays": "^3.36.0",
+    "gtfs-sqljs": "^0.8.0",
+    "sql.js": "^1.14.2"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",

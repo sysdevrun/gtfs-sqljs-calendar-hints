@@ -60,6 +60,61 @@ vacances) cassent le match-all des vacances.
 Sur Car Jaune, `trip-ids` classe 254/350 jours ; `trip-content` classe
 350/350 et retrouve exactement les 3 périodes attendues.
 
+## Librairie : `findCalendarPeriods` sur gtfs-sqljs (sans SQL brut)
+
+`src/calendar-hints.ts` implémente l'algorithme au-dessus d'une instance
+[gtfs-sqljs](https://www.npmjs.com/package/gtfs-sqljs), **uniquement via les
+méthodes `getXXXX`** — aucune requête SQL brute. Le paramètre est typé
+structurellement (`GtfsCalendarSource`) : cinq méthodes suffisent, donc un
+stub de test fonctionne aussi.
+
+| Besoin de l'algorithme | Méthode gtfs-sqljs |
+| --- | --- |
+| Tous les trips + route/direction/service | `getTrips()` sans filtre (1 appel) |
+| Bornes du feed | `getCalendarByServiceId(id)` + `getCalendarDates(id)` par service (dates de début/fin + exceptions type 1) |
+| Services actifs par jour | `getActiveServiceIds('YYYYMMDD')` (1 appel/jour — la lib implémente déjà toute la logique calendar + calendar_dates) |
+| Contenu des trips (mode `trip-content`) | `getStopTimes({ tripId: [...] })` par lots de 500 (les filtres acceptent les tableaux) ; tri par `stop_sequence` côté appelant |
+
+Constats de l'évaluation :
+
+- **Tout est faisable sans SQL brut.** `getActiveServiceIds` évite même de
+  réimplémenter l'activation des services.
+- Il n'existe ni `getCalendars()` (liste complète) ni `getFeedInfo()` : les
+  `service_id` sont donc dérivés de `getTrips()`. Un service sans trip est
+  invisible — sans effet sur les signatures, mais il ne peut pas étendre la
+  plage du feed (c'est plutôt sain).
+- Performances mesurées (sql.js en mémoire, Node) : Car Jaune 55 ms
+  (`trip-ids`) / 170 ms (`trip-content`) ; Astuce (24 873 trips, 650 000
+  stop_times) 189 ms / 2,3 s — le mode contenu est dominé par les
+  `getStopTimes` par lots.
+- Validation croisée : les deux implémentations (lecture CSV directe
+  `src/run.ts` et gtfs-sqljs `src/run-gtfs-sqljs.ts`) produisent des
+  résultats identiques sur les 5 réseaux (mêmes signatures, mêmes groupes,
+  mêmes jours non classés).
+
+```typescript
+import { GtfsSqlJs } from 'gtfs-sqljs'
+import { createSqlJsAdapter } from 'gtfs-sqljs/adapters/sql-js'
+import { findCalendarPeriods } from './src/calendar-hints'
+
+const gtfs = await GtfsSqlJs.fromZip('https://example.com/gtfs.zip', {
+  adapter: await createSqlJsAdapter(),
+})
+const result = await findCalendarPeriods(gtfs, [
+  { name: 'Jours fériés', policy: 'match-all', days: ['2026-11-01', '2026-11-11' /* … */] },
+  { name: 'Vacances scolaires', policy: 'match-all', days: [/* lun-ven des vacances */] },
+], { signatureMode: 'trip-content' })
+
+result.hintResults   // matché ? groupes ? mismatches structurés (2 jours concrets + comptes)
+result.leftoverResult // passe finale per-day-of-week
+result.periods       // groupes fusionnés par signature = les "périodes"
+result.unclassified  // jours restants, groupés par signature
+```
+
+Options : `signatureMode` (`'trip-ids'` par défaut) et `firstDay`/`lastDay`
+pour restreindre la plage analysée (utile contre les queues de feed creuses,
+edge case 18).
+
 ## Edge cases à surveiller (tous observés sur des feeds réels)
 
 **Structure des fichiers**
@@ -143,11 +198,17 @@ Sur Car Jaune, `trip-ids` classe 254/350 jours ; `trip-content` classe
 
 ```bash
 npx tsx src/run.ts car-jaune kar-ouest carsud estival astuce
-  # chaque réseau est passé en mode trip-ids puis trip-content
+  # lecture CSV directe ; chaque réseau passe en trip-ids puis trip-content
+npx tsx src/run-gtfs-sqljs.ts car-jaune estival …
+  # même chose via gtfs-sqljs (méthodes getXXXX uniquement)
 npx tsx src/compare-services.ts <dir>   # services au contenu identique ?
 ```
 
-- `src/lib.ts` : chargement du calendrier + algorithme + rapports.
-- `src/run.ts` : configuration par réseau (zone de fériés, académie).
+- `src/calendar-hints.ts` : **la librairie** — algorithme sur gtfs-sqljs,
+  résultats structurés, sans affichage.
+- `src/lib.ts` : implémentation d'exploration en lecture CSV directe.
+- `src/hints-france.ts` : fériés (date-holidays) et vacances scolaires (API
+  éducation nationale) par réseau.
+- `src/run.ts` / `src/run-gtfs-sqljs.ts` : runners des deux voies.
 - `src/csv.ts` : parseur CSV streaming (BOM, quotes, CRLF).
 - `data/school-calendar.json` : extrait de l'API calendrier scolaire.
