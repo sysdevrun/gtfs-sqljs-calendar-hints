@@ -2,6 +2,16 @@
 
 ## Upcoming release
 
+- Custom hint attributes. `findCalendarPeriods` and `CalendarAnalyzer.analyze`
+  are now generic (`H extends Hint`): hints may carry arbitrary extra
+  attributes, preserved by reference in the results (no copies) and typed all
+  the way through.
+  `MatchedGroup` gains `hint` — the originating hint object (the synthetic
+  'Remaining days' hint for leftover groups) — and `Period` gains `hints` —
+  the distinct contributing hints, in hint order, synthetic leftover hint
+  excluded. Backward compatible (`H` defaults to `Hint`); callers should not
+  mutate a hint after the call if they want a stable result.
+
 ## 0.1.1
 
 - Expand the test suite from 6 to 40 tests. New declarative stub helper (`tests/helpers/stub-source.ts`) builds a `GtfsCalendarSource` from a compact feed description; suites now cover the `per-day-of-week` policy (weekday grouping, partial matches, Monday→Sunday order), hint ordering and cascading (consumed days → `ignoredDays`, failed hints consume nothing), non-canonical hint days (duplicates, unsorted, out of range), days with zero trips (network closed), services present in `calendar.txt` without any trip, dates-only feeds (no `calendar.txt`), both error paths, mismatch message truncation beyond 6 signatures, the exact merge boundaries of `trip-content` mode (different route, direction, `null ≠ 0`, null times, stop_times delivery order, trips without stop_times), and a global invariant: periods ∪ unclassified partition the analysed days exactly and deterministically.

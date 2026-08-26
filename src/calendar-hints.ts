@@ -24,7 +24,16 @@ export interface GtfsCalendarSource {
 export type Policy = 'match-all' | 'per-day-of-week'
 export type SignatureMode = 'trip-ids' | 'trip-content'
 
-/** Days are ISO dates (YYYY-MM-DD). */
+/**
+ * Days are ISO dates (YYYY-MM-DD).
+ *
+ * A hint may carry arbitrary extra attributes (extend this interface): the
+ * results reference the original hint objects — never copies — so those
+ * attributes come back in `HintResult.hint`, `MatchedGroup.hint` and
+ * `Period.hints`, typed via the `H extends Hint` generic of
+ * `findCalendarPeriods`. Do not mutate a hint after the call if you want a
+ * stable result.
+ */
 export interface Hint {
   name: string
   policy: Policy
@@ -60,9 +69,14 @@ export interface DayInfo {
   serviceIds: string[]
 }
 
-export interface MatchedGroup {
+export interface MatchedGroup<H extends Hint = Hint> {
   label: string
   hintName: string
+  /**
+   * The originating hint, by reference (for groups of the final leftover
+   * pass, the synthetic 'Remaining days' hint)
+   */
+  hint: H
   /** 0=Sunday … 6=Saturday for per-day-of-week groups, null for match-all */
   weekday: number | null
   days: string[]
@@ -84,14 +98,15 @@ export interface Mismatch {
   message: string
 }
 
-export interface HintResult {
-  hint: Hint
+export interface HintResult<H extends Hint = Hint> {
+  /** The original hint object, by reference (custom attributes included) */
+  hint: H
   /** Hint days inside the feed range and not consumed by a previous hint */
   inScopeDays: string[]
   /** Hint days out of range or already consumed */
   ignoredDays: string[]
   matched: boolean
-  groups: MatchedGroup[]
+  groups: MatchedGroup<H>[]
   mismatches: Mismatch[]
 }
 
@@ -103,24 +118,30 @@ export interface UnclassifiedGroup {
 }
 
 /** Matched groups sharing one signature, merged into a single period. */
-export interface Period {
+export interface Period<H extends Hint = Hint> {
   labels: string[]
+  /**
+   * Distinct user hints contributing to this period, in hint order, by
+   * reference. The synthetic leftover hint is excluded: a period made only
+   * of leftover groups has an empty array.
+   */
+  hints: H[]
   days: string[]
   signature: string
   tripCount: number
   serviceIds: string[]
 }
 
-export interface CalendarHintsResult {
+export interface CalendarHintsResult<H extends Hint = Hint> {
   firstDay: string
   lastDay: string
   /** Signature of every analysed day, for exploration and debugging */
   days: DayInfo[]
-  hintResults: HintResult[]
+  hintResults: HintResult<H>[]
   /** Final implicit per-day-of-week pass over the remaining days */
   leftoverResult: HintResult
   unclassified: UnclassifiedGroup[]
-  periods: Period[]
+  periods: Period<H>[]
 }
 
 // ---------------------------------------------------------------------------
@@ -372,10 +393,11 @@ function buildMismatch(weekday: number | null, bySignature: Map<string, string[]
   }
 }
 
-function makeGroup(label: string, hintName: string, weekday: number | null, days: string[], feed: FeedCalendar): MatchedGroup {
+function makeGroup<H extends Hint>(label: string, hint: H, weekday: number | null, days: string[], feed: FeedCalendar): MatchedGroup<H> {
   return {
     label,
-    hintName,
+    hintName: hint.name,
+    hint,
     weekday,
     days,
     signature: feed.signatureOf(days[0]),
@@ -384,10 +406,10 @@ function makeGroup(label: string, hintName: string, weekday: number | null, days
   }
 }
 
-function applyHint(hint: Hint, remainingDays: Set<string>, feed: FeedCalendar): HintResult {
+function applyHint<H extends Hint>(hint: H, remainingDays: Set<string>, feed: FeedCalendar): HintResult<H> {
   const uniqueDays = [...new Set(hint.days)].sort()
   const inScopeDays = uniqueDays.filter(d => remainingDays.has(d))
-  const result: HintResult = {
+  const result: HintResult<H> = {
     hint,
     inScopeDays,
     ignoredDays: uniqueDays.filter(d => !remainingDays.has(d)),
@@ -402,7 +424,7 @@ function applyHint(hint: Hint, remainingDays: Set<string>, feed: FeedCalendar): 
     const bySignature = groupBySignature(inScopeDays, feed)
     if (bySignature.size === 1) {
       result.matched = true
-      result.groups.push(makeGroup(hint.name, hint.name, null, inScopeDays, feed))
+      result.groups.push(makeGroup(hint.name, hint, null, inScopeDays, feed))
       for (const d of inScopeDays) remainingDays.delete(d)
     } else {
       result.mismatches.push(buildMismatch(null, bySignature, feed))
@@ -415,7 +437,7 @@ function applyHint(hint: Hint, remainingDays: Set<string>, feed: FeedCalendar): 
       if (days.length === 0) continue
       const bySignature = groupBySignature(days, feed)
       if (bySignature.size === 1) {
-        result.groups.push(makeGroup(`${hint.name} — ${WEEKDAY_NAMES[weekday]}`, hint.name, weekday, days, feed))
+        result.groups.push(makeGroup(`${hint.name} — ${WEEKDAY_NAMES[weekday]}`, hint, weekday, days, feed))
         for (const d of days) remainingDays.delete(d)
       } else {
         result.mismatches.push(buildMismatch(weekday, bySignature, feed))
@@ -441,7 +463,7 @@ export interface CalendarAnalyzer {
   lastDay: string
   /** Signature of every analysed day, for exploration and debugging */
   days: DayInfo[]
-  analyze(hints: Hint[]): CalendarHintsResult
+  analyze<H extends Hint = Hint>(hints: H[]): CalendarHintsResult<H>
 }
 
 export async function createCalendarAnalyzer(
@@ -465,24 +487,21 @@ export async function createCalendarAnalyzer(
   }
 }
 
-export async function findCalendarPeriods(
+export async function findCalendarPeriods<H extends Hint = Hint>(
   gtfs: GtfsCalendarSource,
-  hints: Hint[],
+  hints: H[],
   options: CalendarHintsOptions = {},
-): Promise<CalendarHintsResult> {
+): Promise<CalendarHintsResult<H>> {
   return (await createCalendarAnalyzer(gtfs, options)).analyze(hints)
 }
 
-function analyzeWithFeed(feed: FeedCalendar, days: DayInfo[], hints: Hint[]): CalendarHintsResult {
+function analyzeWithFeed<H extends Hint>(feed: FeedCalendar, days: DayInfo[], hints: H[]): CalendarHintsResult<H> {
   const remainingDays = new Set(feed.allDays)
   const hintResults = hints.map(h => applyHint(h, remainingDays, feed))
 
   // Final pass: per-day-of-week over whatever remains
-  const leftoverResult = applyHint(
-    { name: 'Remaining days', policy: 'per-day-of-week', days: [...remainingDays] },
-    remainingDays,
-    feed,
-  )
+  const leftoverHint: Hint = { name: 'Remaining days', policy: 'per-day-of-week', days: [...remainingDays] }
+  const leftoverResult = applyHint(leftoverHint, remainingDays, feed)
 
   const unclassified: UnclassifiedGroup[] = [...groupBySignature([...remainingDays].sort(), feed).entries()]
     .map(([signature, groupDays]) => ({
@@ -495,13 +514,15 @@ function analyzeWithFeed(feed: FeedCalendar, days: DayInfo[], hints: Hint[]): Ca
 
   // Matched groups sharing a signature are one period
   const mergedBySignature = new Map<string, MatchedGroup[]>()
-  for (const g of [...hintResults, leftoverResult].flatMap(r => r.groups)) {
+  for (const g of [...hintResults as HintResult[], leftoverResult].flatMap(r => r.groups)) {
     if (!mergedBySignature.has(g.signature)) mergedBySignature.set(g.signature, [])
     mergedBySignature.get(g.signature)!.push(g)
   }
-  const periods: Period[] = [...mergedBySignature.entries()]
+  const periods: Period<H>[] = [...mergedBySignature.entries()]
     .map(([signature, groups]) => ({
       labels: groups.map(g => g.label),
+      // Every hint but the synthetic leftover one comes from the H[] input
+      hints: [...new Set(groups.map(g => g.hint))].filter(h => h !== leftoverHint) as H[],
       days: groups.flatMap(g => g.days).sort(),
       signature,
       tripCount: groups[0].tripCount,
