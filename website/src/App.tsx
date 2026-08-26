@@ -12,9 +12,10 @@ import type { CalendarHintsResult, SignatureMode } from '../../src/calendar-hint
 import type { GtfsWorkerAPI, ProgressInfo, FeedSummary } from './gtfs.worker'
 import { proxyUrl } from './proxy'
 import { PRESETS, type Academy, type HolidayZone, type NetworkPreset } from './presets'
-import { generateHints, type GeneratedHints } from './hints'
+import { generateHints, DEFAULT_HINT_CONFIGS, type GeneratedHints, type HintConfig } from './hints'
 import ResultsView from './components/ResultsView'
 import HintsView from './components/HintsView'
+import HintsEditor from './components/HintsEditor'
 
 interface Settings {
   zone: HolidayZone
@@ -22,6 +23,7 @@ interface Settings {
   mode: SignatureMode
   firstDay: string
   lastDay: string
+  hintConfigs: HintConfig[]
 }
 
 const SELECTOR_TABS = [fileTab, urlTab, transportDataGouvFr, mobilityDataCsv]
@@ -32,6 +34,7 @@ const DEFAULT_SETTINGS: Settings = {
   mode: 'trip-content',
   firstDay: '',
   lastDay: '',
+  hintConfigs: DEFAULT_HINT_CONFIGS,
 }
 
 interface Analysis {
@@ -78,7 +81,7 @@ export default function App() {
       // Première passe légère pour connaître la plage du feed…
       const probe = await worker.analyze([], { signatureMode: 'trip-ids', ...clip })
       // …qui permet de générer les hints (fériés + vacances scolaires)…
-      const generated = await generateHints(s.zone, s.academy, probe.firstDay, probe.lastDay)
+      const generated = await generateHints(s.zone, s.academy, probe.firstDay, probe.lastDay, s.hintConfigs)
       // …puis l'analyse complète dans le mode choisi.
       const result = await worker.analyze(generated.hints, { signatureMode: s.mode, ...clip })
       setAnalysis({ result, generated, mode: s.mode, durationMs: performance.now() - started })
@@ -220,6 +223,14 @@ export default function App() {
             <input type="date" value={settings.lastDay} disabled={busy}
               onChange={e => updateSetting('lastDay', e.target.value)} />
           </label>
+        </div>
+        <h3>Hints</h3>
+        <HintsEditor
+          configs={settings.hintConfigs}
+          disabled={busy}
+          onChange={configs => updateSetting('hintConfigs', configs)}
+        />
+        <div className="settings-actions">
           <button className="analyze-button" disabled={!canAnalyze} onClick={() => void runAnalysis(settings)}>
             Relancer l'analyse
           </button>
