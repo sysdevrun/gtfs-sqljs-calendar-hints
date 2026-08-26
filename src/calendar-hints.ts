@@ -43,6 +43,14 @@ export interface CalendarHintsOptions {
   /** Clip the analysed range (ISO dates), e.g. to ignore a hollow feed tail. */
   firstDay?: string
   lastDay?: string
+  /**
+   * When the source carries a gtfs-sqljs adapter database on `db` (as
+   * GtfsSqlJs instances do), a few raw read-only SQL queries replace the
+   * row-by-row getXXXX calls, with identical results. Any failure falls
+   * back to the portable path. Set to false to force the portable path.
+   * Default: true.
+   */
+  fastPath?: boolean
 }
 
 export interface DayInfo {
@@ -150,7 +158,39 @@ function hash64(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Feed calendar built exclusively from getXXXX methods
+// Optional raw-SQL fast path. gtfs-sqljs instances expose their adapter
+// database as `db` (prepare/step/getAsObject); when present, two read-only
+// queries replace the row-by-row getXXXX calls with identical results.
+// Sources without `db` (test stubs, other backends) use the portable path.
+// ---------------------------------------------------------------------------
+interface RawSqlStatement {
+  step(): Promise<boolean>
+  getAsObject(): Promise<Record<string, unknown>>
+  free(): Promise<void>
+}
+interface RawSqlDatabase {
+  prepare(sql: string): Promise<RawSqlStatement>
+}
+
+function rawDatabaseOf(gtfs: GtfsCalendarSource, options: CalendarHintsOptions): RawSqlDatabase | null {
+  if (options.fastPath === false) return null
+  const db = (gtfs as { db?: unknown }).db
+  return db && typeof (db as RawSqlDatabase).prepare === 'function' ? (db as RawSqlDatabase) : null
+}
+
+async function rawAll(db: RawSqlDatabase, sql: string): Promise<Record<string, unknown>[]> {
+  const stmt = await db.prepare(sql)
+  const rows: Record<string, unknown>[] = []
+  try {
+    while (await stmt.step()) rows.push(await stmt.getAsObject())
+  } finally {
+    await stmt.free()
+  }
+  return rows
+}
+
+// ---------------------------------------------------------------------------
+// Feed calendar built from getXXXX methods (or the raw fast path)
 // ---------------------------------------------------------------------------
 interface FeedCalendar {
   firstDay: string
@@ -164,12 +204,70 @@ interface FeedCalendar {
 
 const STOP_TIMES_BATCH = 500
 
+type TripRow = { trip_id: string; service_id: string; route_id: string; direction_id?: number | null }
+
+async function loadTrips(gtfs: GtfsCalendarSource, db: RawSqlDatabase | null): Promise<TripRow[]> {
+  if (db) {
+    try {
+      const rows = await rawAll(db, 'SELECT trip_id, service_id, route_id, direction_id FROM trips')
+      return rows.map(r => ({
+        trip_id: String(r.trip_id),
+        service_id: String(r.service_id),
+        route_id: String(r.route_id),
+        direction_id: r.direction_id === null || r.direction_id === undefined ? null : Number(r.direction_id),
+      }))
+    } catch { /* portable fallback below */ }
+  }
+  return gtfs.getTrips()
+}
+
+async function loadContentKeys(gtfs: GtfsCalendarSource, db: RawSqlDatabase | null, trips: TripRow[]): Promise<Map<string, string>> {
+  const routeOf = (t: TripRow) => `route ${t.route_id} dir ${t.direction_id ?? ''}`
+  let contentByTrip: Map<string, string> | null = null
+
+  if (db) {
+    // One aggregated query: SQLite builds each trip's stop/time sequence
+    // string itself (GROUP_CONCAT … ORDER BY needs SQLite ≥ 3.44); ~26×
+    // fewer rows cross the JS boundary than with per-row stop_times reads.
+    try {
+      const rows = await rawAll(db,
+        `SELECT trip_id, GROUP_CONCAT(stop_id || '@' || IFNULL(arrival_time, '') || '>' || IFNULL(departure_time, ''), ';' ORDER BY stop_sequence) AS content
+         FROM stop_times GROUP BY trip_id`)
+      contentByTrip = new Map(rows.map(r => [String(r.trip_id), r.content === null || r.content === undefined ? '' : String(r.content)]))
+    } catch { contentByTrip = null }
+  }
+
+  if (contentByTrip === null) {
+    // Portable path: batched getStopTimes({ tripId: [...] }) — filters
+    // accept arrays. No ordering is assumed from the source; stops are
+    // sorted by stop_sequence before building each trip's string.
+    const stopsByTrip = new Map<string, { seq: number; stop: string }[]>()
+    const tripIds = trips.map(t => t.trip_id)
+    for (let i = 0; i < tripIds.length; i += STOP_TIMES_BATCH) {
+      for (const st of await gtfs.getStopTimes({ tripId: tripIds.slice(i, i + STOP_TIMES_BATCH) })) {
+        if (!stopsByTrip.has(st.trip_id)) stopsByTrip.set(st.trip_id, [])
+        stopsByTrip.get(st.trip_id)!.push({ seq: st.stop_sequence, stop: `${st.stop_id}@${st.arrival_time ?? ''}>${st.departure_time ?? ''}` })
+      }
+    }
+    contentByTrip = new Map()
+    for (const [tripId, stops] of stopsByTrip) {
+      contentByTrip.set(tripId, stops.sort((a, b) => a.seq - b.seq).map(x => x.stop).join(';'))
+    }
+  }
+
+  const contentKeys = new Map<string, string>()
+  for (const t of trips) contentKeys.set(t.trip_id, hash64(`${routeOf(t)} :: ${contentByTrip.get(t.trip_id) ?? ''}`))
+  return contentKeys
+}
+
 async function loadFeedCalendar(
   gtfs: GtfsCalendarSource,
   options: CalendarHintsOptions,
 ): Promise<FeedCalendar> {
-  // 1. One getTrips() call: trips per service + route/direction per trip
-  const trips = await gtfs.getTrips()
+  const db = rawDatabaseOf(gtfs, options)
+
+  // 1. One trips read: trips per service + route/direction per trip
+  const trips = await loadTrips(gtfs, db)
   const tripsByService = new Map<string, string[]>()
   for (const t of trips) {
     if (!tripsByService.has(t.service_id)) tripsByService.set(t.service_id, [])
@@ -205,24 +303,9 @@ async function loadFeedCalendar(
   }
 
   // 4. Equality key per trip: its trip_id, or the hash of its content
-  // (batched getStopTimes({ tripId: [...] }) — filters accept arrays)
-  let contentKeys: Map<string, string> | null = null
-  if (options.signatureMode === 'trip-content') {
-    const routeByTrip = new Map(trips.map(t => [t.trip_id, `route ${t.route_id} dir ${t.direction_id ?? ''}`]))
-    const stopsByTrip = new Map<string, { seq: number; stop: string }[]>()
-    const tripIds = trips.map(t => t.trip_id)
-    for (let i = 0; i < tripIds.length; i += STOP_TIMES_BATCH) {
-      for (const st of await gtfs.getStopTimes({ tripId: tripIds.slice(i, i + STOP_TIMES_BATCH) })) {
-        if (!stopsByTrip.has(st.trip_id)) stopsByTrip.set(st.trip_id, [])
-        stopsByTrip.get(st.trip_id)!.push({ seq: st.stop_sequence, stop: `${st.stop_id}@${st.arrival_time ?? ''}>${st.departure_time ?? ''}` })
-      }
-    }
-    contentKeys = new Map()
-    for (const [tripId, route] of routeByTrip) {
-      const stops = (stopsByTrip.get(tripId) ?? []).sort((a, b) => a.seq - b.seq)
-      contentKeys.set(tripId, hash64(`${route} :: ${stops.map(x => x.stop).join(';')}`))
-    }
-  }
+  const contentKeys = options.signatureMode === 'trip-content'
+    ? await loadContentKeys(gtfs, db, trips)
+    : null
   const keyOf = (tripId: string) => (contentKeys ? contentKeys.get(tripId)! : tripId)
 
   // Signatures memoized per service combination
@@ -344,13 +427,27 @@ function applyHint(hint: Hint, remainingDays: Set<string>, feed: FeedCalendar): 
 }
 
 // ---------------------------------------------------------------------------
-// Entry point
+// Entry points
 // ---------------------------------------------------------------------------
-export async function findCalendarPeriods(
+
+/**
+ * Feed calendar loaded once; analyze() is pure in-memory computation (no
+ * further gtfs calls), so trying several hint sets costs milliseconds
+ * instead of re-reading trips and stop_times every time. The range and
+ * signatureMode are fixed at creation.
+ */
+export interface CalendarAnalyzer {
+  firstDay: string
+  lastDay: string
+  /** Signature of every analysed day, for exploration and debugging */
+  days: DayInfo[]
+  analyze(hints: Hint[]): CalendarHintsResult
+}
+
+export async function createCalendarAnalyzer(
   gtfs: GtfsCalendarSource,
-  hints: Hint[],
   options: CalendarHintsOptions = {},
-): Promise<CalendarHintsResult> {
+): Promise<CalendarAnalyzer> {
   const feed = await loadFeedCalendar(gtfs, options)
 
   const days: DayInfo[] = feed.allDays.map(date => ({
@@ -360,6 +457,23 @@ export async function findCalendarPeriods(
     serviceIds: feed.serviceIdsOf(date),
   }))
 
+  return {
+    firstDay: feed.firstDay,
+    lastDay: feed.lastDay,
+    days,
+    analyze: hints => analyzeWithFeed(feed, days, hints),
+  }
+}
+
+export async function findCalendarPeriods(
+  gtfs: GtfsCalendarSource,
+  hints: Hint[],
+  options: CalendarHintsOptions = {},
+): Promise<CalendarHintsResult> {
+  return (await createCalendarAnalyzer(gtfs, options)).analyze(hints)
+}
+
+function analyzeWithFeed(feed: FeedCalendar, days: DayInfo[], hints: Hint[]): CalendarHintsResult {
   const remainingDays = new Set(feed.allDays)
   const hintResults = hints.map(h => applyHint(h, remainingDays, feed))
 
@@ -395,5 +509,5 @@ export async function findCalendarPeriods(
     }))
     .sort((a, b) => b.days.length - a.days.length)
 
-  return { firstDay: feed.firstDay, lastDay: feed.lastDay, days, hintResults, leftoverResult, unclassified, periods }
+  return { firstDay: feed.firstDay, lastDay: feed.lastDay, days: [...days], hintResults, leftoverResult, unclassified, periods }
 }
