@@ -1,0 +1,6 @@
+route_id,service_id,trip_id,direction_id
+R1,WD,T1,0
+R1,WD,T2,1
+R1,SAT,A1,0
+R1,SUN,S1,0
+R1,HOL,H1,0

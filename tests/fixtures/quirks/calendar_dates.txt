@@ -1,0 +1,11 @@
+date,exception_type,service_id
+20260105,1,service semaine A
+20260106,1,service semaine A
+20260107,1,service semaine A
+20260108,1,service semaine A
+20260109,1,service semaine A
+20260112,1,service semaine B
+20260113,1,service semaine B
+20260114,1,service semaine B
+20260115,1,service semaine B
+20260116,1,service semaine B
