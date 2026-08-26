@@ -1,7 +1,7 @@
 // Génération des hints côté navigateur : jours fériés français calculés
 // localement (computus), vacances scolaires depuis l'API
 // data.education.gouv.fr avec repli sur l'extrait embarqué du dépôt.
-import type { Hint } from '../../src/calendar-hints'
+import type { Hint, Policy } from '../../src/calendar-hints'
 import type { Academy, HolidayZone } from './presets'
 import schoolCalendarFallback from '../../data/school-calendar.json'
 
@@ -145,6 +145,56 @@ export function vacationDaysOf(ranges: VacationRange[]): string[] {
   return [...new Set(ranges.flatMap(v => eachDay(v.first, v.last)))].filter(isMonToFri).sort()
 }
 
+// ---------------------------------------------------------------------------
+// Configuration des hints : liste ordonnée, réordonnable, extensible.
+// Les sources « auto » (fériés, vacances scolaires) sont résolues à l'analyse
+// sur la plage du feed ; les hints personnalisés listent leurs dates.
+// ---------------------------------------------------------------------------
+export type HintSource = 'holidays' | 'school-vacations' | 'custom'
+
+export interface HintConfig {
+  id: string
+  source: HintSource
+  name: string
+  policy: Policy
+  enabled: boolean
+  /** Source « custom » uniquement : dates ou plages `AAAA-MM-JJ..AAAA-MM-JJ`,
+   *  séparées par espaces, virgules ou retours à la ligne. */
+  daysText: string
+}
+
+export const DEFAULT_HINT_CONFIGS: HintConfig[] = [
+  { id: 'holidays', source: 'holidays', name: 'Jours fériés', policy: 'match-all', enabled: true, daysText: '' },
+  { id: 'school-vacations', source: 'school-vacations', name: 'Vacances scolaires (lun-ven)', policy: 'match-all', enabled: true, daysText: '' },
+]
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const isValidDate = (s: string) => {
+  if (!DATE_RE.test(s)) return false
+  const t = Date.parse(s + 'T00:00:00Z')
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === s
+}
+const MAX_RANGE_DAYS = 3700 // garde-fou contre les fautes de frappe sur l'année
+
+export function parseDaysText(text: string): { days: string[]; invalid: string[] } {
+  const days = new Set<string>()
+  const invalid: string[] = []
+  for (const token of text.split(/[\s,;]+/).filter(Boolean)) {
+    const parts = token.split(/\.\.+|->|→/)
+    if (parts.length === 1 && isValidDate(parts[0])) {
+      days.add(parts[0])
+    } else if (
+      parts.length === 2 && isValidDate(parts[0]) && isValidDate(parts[1]) &&
+      parts[0] <= parts[1] && eachDay(parts[0], parts[1]).length <= MAX_RANGE_DAYS
+    ) {
+      for (const d of eachDay(parts[0], parts[1])) days.add(d)
+    } else {
+      invalid.push(token)
+    }
+  }
+  return { days: [...days].sort(), invalid }
+}
+
 export interface GeneratedHints {
   holidays: PublicHoliday[]
   vacationRanges: VacationRange[]
@@ -156,12 +206,17 @@ export async function generateHints(
   academy: Academy,
   firstDay: string,
   lastDay: string,
+  configs: HintConfig[] = DEFAULT_HINT_CONFIGS,
 ): Promise<GeneratedHints> {
   const holidays = publicHolidays(zone, firstDay, lastDay)
   const vacationRanges = await schoolVacationRanges(academy, firstDay, lastDay)
-  const hints: Hint[] = [
-    { name: 'Jours fériés', policy: 'match-all', days: holidays.map(h => h.date) },
-    { name: 'Vacances scolaires (lun-ven)', policy: 'match-all', days: vacationDaysOf(vacationRanges) },
-  ]
+  const daysOf = (c: HintConfig): string[] => {
+    if (c.source === 'holidays') return holidays.map(h => h.date)
+    if (c.source === 'school-vacations') return vacationDaysOf(vacationRanges)
+    return parseDaysText(c.daysText).days
+  }
+  const hints: Hint[] = configs
+    .filter(c => c.enabled)
+    .map(c => ({ name: c.name, policy: c.policy, days: daysOf(c) }))
   return { holidays, vacationRanges, hints }
 }

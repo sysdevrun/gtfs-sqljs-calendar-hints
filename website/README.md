@@ -14,7 +14,11 @@ directement dans le navigateur :
   Réunion et Normandie via l'API `data.education.gouv.fr`, avec repli sur
   `data/school-calendar.json`) sont générés automatiquement, puis
   `findCalendarPeriods` est exécuté et les périodes affichées (synthèse,
-  calendrier coloré, détail des hints, jours non classés).
+  calendrier coloré, détail des hints, jours non classés) ;
+- la liste des hints est **configurable** : réordonnancement (l'ordre compte,
+  chaque hint consomme ses jours), activation/désactivation, renommage, choix
+  de la politique (`match-all` / `per-day-of-week`) et ajout de hints
+  personnalisés avec des dates ou plages (`2026-02-10..2026-02-14`).
 
 ## Développement
 
