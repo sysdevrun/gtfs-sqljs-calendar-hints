@@ -11,8 +11,10 @@ export const PERIOD_COLORS = [
   '#dc2626', '#4f46e5', '#059669', '#d97706', '#db2777', '#65a30d',
 ]
 
-// La librairie produit des libellés en anglais ; on les traduit à l'affichage
+// La librairie produit des libellés en anglais ; on les traduit à l'affichage.
+// « Remaining days — lundis » est réduit au seul nom du jour.
 const LABEL_FR: [string, string][] = [
+  ['Remaining days — ', ''],
   ['Remaining days', 'Jours restants'],
   ['Mondays', 'lundis'],
   ['Tuesdays', 'mardis'],
@@ -82,6 +84,19 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
     () => new Set(result.days.map(d => d.signature)).size,
     [result],
   )
+  // Périodes dans l'ordre des hints (puis des jours restants), pas par taille
+  const orderedPeriods = useMemo(() => {
+    const order = new Map<string, number>()
+    let i = 0
+    for (const r of [...result.hintResults, result.leftoverResult]) {
+      for (const g of r.groups) {
+        if (!order.has(g.signature)) order.set(g.signature, i++)
+      }
+    }
+    return [...result.periods].sort(
+      (a, b) => (order.get(a.signature) ?? Infinity) - (order.get(b.signature) ?? Infinity),
+    )
+  }, [result])
   const unclassifiedCount = result.unclassified.reduce((n, g) => n + g.days.length, 0)
 
   return (
@@ -94,7 +109,7 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
           {unclassifiedCount} jour{unclassifiedCount > 1 ? 's' : ''} non classé{unclassifiedCount > 1 ? 's' : ''})
         </p>
         <div className="period-list">
-          {result.periods.map((p, i) => (
+          {orderedPeriods.map((p, i) => (
             <PeriodCard key={p.signature} period={p} color={PERIOD_COLORS[i % PERIOD_COLORS.length]} />
           ))}
         </div>
@@ -103,7 +118,7 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
       <section className="card">
         <h2>Calendrier</h2>
         <p className="muted">Chaque jour est coloré selon sa période ; les jours non classés sont hachurés.</p>
-        <CalendarGrid result={result} colors={PERIOD_COLORS} />
+        <CalendarGrid result={result} periods={orderedPeriods} colors={PERIOD_COLORS} />
       </section>
 
       <section className="card">

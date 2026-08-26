@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { CalendarHintsResult } from '../../../src/calendar-hints'
+import type { CalendarHintsResult, Period } from '../../../src/calendar-hints'
 import { frLabel } from './ResultsView'
 
 const MONTHS_FR = [
@@ -22,10 +22,15 @@ interface Month {
   cells: (DayCell | null)[]
 }
 
-export default function CalendarGrid({ result, colors }: { result: CalendarHintsResult; colors: string[] }) {
+export default function CalendarGrid({ result, periods, colors }: {
+  result: CalendarHintsResult
+  /** Périodes déjà triées : mêmes indices de couleur que les cartes */
+  periods: Period[]
+  colors: string[]
+}) {
   const months = useMemo<Month[]>(() => {
     const byDate = new Map<string, DayCell>()
-    result.periods.forEach((p, i) => {
+    periods.forEach((p, i) => {
       const color = colors[i % colors.length]
       const label = p.labels.map(frLabel).join(' + ')
       for (const d of p.days) {
@@ -63,7 +68,7 @@ export default function CalendarGrid({ result, colors }: { result: CalendarHints
       current.cells.push(byDate.get(day.date)!)
     }
     return months
-  }, [result, colors])
+  }, [result, periods, colors])
 
   return (
     <div className="calendar-grid">
