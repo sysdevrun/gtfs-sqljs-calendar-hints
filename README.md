@@ -68,6 +68,12 @@ méthodes `getXXXX`** — aucune requête SQL brute. Le paramètre est typé
 structurellement (`GtfsCalendarSource`) : cinq méthodes suffisent, donc un
 stub de test fonctionne aussi.
 
+La librairie n'a **aucune dépendance** : les jours fériés et les vacances
+scolaires sont fournis par l'appelant, sous forme de listes de dates ISO dans
+les `days` des hints. Voir « Générer les jours des hints » ci-dessous pour
+les sources recommandées, et `src/hints-france.ts` pour un générateur
+d'exemple (utilisé par les runners de ce dépôt).
+
 | Besoin de l'algorithme | Méthode gtfs-sqljs |
 | --- | --- |
 | Tous les trips + route/direction/service | `getTrips()` sans filtre (1 appel) |
@@ -183,7 +189,10 @@ edge case 18).
     jeudi/vendredi), Carsud (vendredi ≠ lundi-jeudi, 12 trips échangés).
     C'est précisément ce que `per-day-of-week` sait capturer.
 
-## Données de référence
+## Générer les jours des hints (côté appelant)
+
+La librairie ne génère ni fériés ni vacances : c'est à l'appelant de
+construire les listes de dates. Sources recommandées pour la France :
 
 - **Jours fériés** : npm `date-holidays`, `new Holidays('FR')` pour la
   métropole, `new Holidays('FR', 'RE')` pour La Réunion (inclut l'Abolition
@@ -193,6 +202,10 @@ edge case 18).
   `data.education.gouv.fr` / dataset `fr-en-calendrier-scolaire`
   (académies « Réunion », « Normandie »…). Garder `population` ∈
   {`-`, `Élèves`}. Conventions : voir edge cases 10-13.
+
+`src/hints-france.ts` implémente ces deux générateurs (exemple, hors
+librairie — `date-holidays` est une devDependency de ce dépôt, pas une
+dépendance de `calendar-hints.ts`).
 
 ## Scripts
 
