@@ -2,6 +2,8 @@
 
 ## Upcoming release
 
+## 0.3.0
+
 - **Breaking: `GtfsCalendarSource` now targets gtfs-sqljs ≥ 0.9.0.**
   `getCalendarByServiceId(id)` and `getActiveServiceIds(date)` are no longer
   used; the interface instead requires the bulk readers `getCalendars()` and

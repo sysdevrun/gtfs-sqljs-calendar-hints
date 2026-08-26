@@ -1,6 +1,6 @@
 {
   "name": "gtfs-sqljs-calendar-hints",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Detect service periods (school/holiday weekdays, Sundays & public holidays, …) in a GTFS calendar from user-provided hints, with strictly exact matching. Zero dependencies; pairs with gtfs-sqljs.",
   "type": "module",
   "main": "./dist/index.js",
