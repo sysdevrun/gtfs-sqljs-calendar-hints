@@ -137,6 +137,35 @@ Options : `signatureMode` (`'trip-ids'` par défaut) et `firstDay`/`lastDay`
 pour restreindre la plage analysée (utile contre les queues de feed creuses,
 edge case 18).
 
+### Attributs personnalisés sur les hints
+
+Un hint peut porter des attributs supplémentaires (couleur, id, méta…) : la
+librairie ne les lit pas mais les restitue. Les résultats référencent les
+objets hints d'origine — jamais de copie :
+
+- `hintResults[i].hint` : le hint tel que fourni ;
+- `hintResults[i].groups[j].hint` : le hint à l'origine du groupe (pour les
+  groupes de la passe finale, le pseudo-hint « Remaining days ») ;
+- `periods[k].hints` : les hints distincts ayant contribué à la période, dans
+  l'ordre des hints, pseudo-hint de la passe finale exclu (une période issue
+  uniquement de la passe finale a `hints: []`).
+
+`findCalendarPeriods` est générique (`H extends Hint`) : déclarez votre type
+de hint et les attributs reviennent typés.
+
+```typescript
+interface MyHint extends Hint { color: string }
+
+const hints: MyHint[] = [
+  { name: 'Jours fériés', policy: 'match-all', days: ['2026-11-01' /* … */], color: '#e33' },
+]
+const result = await findCalendarPeriods(gtfs, hints)
+result.periods[0].hints[0]?.color   // '#e33' — même objet, typé MyHint
+```
+
+Conséquence du passage par référence : ne mutez pas un hint après l'appel si
+vous voulez un résultat stable.
+
 ## Edge cases à surveiller (tous observés sur des feeds réels)
 
 **Structure des fichiers**
