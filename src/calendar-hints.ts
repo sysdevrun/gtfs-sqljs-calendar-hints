@@ -1,23 +1,40 @@
 // gtfs-calendar-hints — detect service periods in a GTFS calendar from
 // user-provided hints, with strictly exact matching (no threshold).
 //
-// Works on top of a gtfs-sqljs instance, using ONLY its getXXXX methods
-// (no raw SQL). The parameter is typed structurally, so anything that
-// implements the five methods below works (including a test stub).
+// Works on top of a gtfs-sqljs (≥ 0.9.0) instance through its bulk getXXXX
+// methods. The parameter is typed structurally, so anything that implements
+// the four required methods below works (including a test stub); the two
+// optional ones unlock feed_info clipping and frequency-aware signatures.
 
 export interface GtfsCalendarSource {
   getTrips(filters?: object): Promise<{ trip_id: string; service_id: string; route_id: string; direction_id?: number | null }[]>
-  getCalendarByServiceId(serviceId: string): Promise<{
+  /** Whole calendar table (gtfs-sqljs ≥ 0.9.0) */
+  getCalendars(): Promise<{
     service_id: string
     monday: number; tuesday: number; wednesday: number; thursday: number
     friday: number; saturday: number; sunday: number
     start_date: string; end_date: string
-  } | null>
-  getCalendarDates(serviceId: string): Promise<{ service_id: string; date: string; exception_type: number }[]>
-  getActiveServiceIds(date: string): Promise<string[]>
+  }[]>
+  /** Whole calendar_dates table (gtfs-sqljs ≥ 0.9.0 accepts the no-arg call) */
+  getCalendarDates(): Promise<{ service_id: string; date: string; exception_type: number }[]>
   getStopTimes(filters?: { tripId?: string | string[] }): Promise<{
     trip_id: string; arrival_time?: string | null; departure_time?: string | null
     stop_id: string; stop_sequence: number
+  }[]>
+  /**
+   * Optional: feed validity window (feed_info). When present, the analysed
+   * range is clipped to [feed_start_date, feed_end_date] unless
+   * `useFeedInfo: false`.
+   */
+  getFeedInfo?(): Promise<{ feed_start_date?: string | null; feed_end_date?: string | null }[]>
+  /**
+   * Optional: frequency-based trips (frequencies). When present, in
+   * 'trip-content' mode a trip's frequency rows are part of its content, so
+   * two trips serving the same stops on different headways stay distinct.
+   */
+  getFrequencies?(): Promise<{
+    trip_id: string; start_time: string; end_time: string
+    headway_secs: number; exact_times?: number | null
   }[]>
 }
 
@@ -52,6 +69,13 @@ export interface CalendarHintsOptions {
   /** Clip the analysed range (ISO dates), e.g. to ignore a hollow feed tail. */
   firstDay?: string
   lastDay?: string
+  /**
+   * When the source exposes getFeedInfo() and feed_info carries
+   * feed_start_date/feed_end_date, clip the analysed range to that validity
+   * window (the spec says data outside it is not reliable). Set to false to
+   * analyse the full calendar range regardless. Default: true.
+   */
+  useFeedInfo?: boolean
   /**
    * When the source carries a gtfs-sqljs adapter database on `db` (as
    * GtfsSqlJs instances do), a few raw read-only SQL queries replace the
@@ -149,6 +173,8 @@ export interface CalendarHintsResult<H extends Hint = Hint> {
 // ---------------------------------------------------------------------------
 const WEEKDAY_NAMES =['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays']
 const MONDAY_TO_SUNDAY = [1, 2, 3, 4, 5, 6, 0]
+// calendar.txt weekday columns, indexed by weekdayOf (0=Sunday … 6=Saturday)
+const DAY_FIELDS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 
 const gtfsDateToIso = (d: string) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
 const isoToGtfsDate = (iso: string) => iso.replaceAll('-', '')
@@ -276,8 +302,23 @@ async function loadContentKeys(gtfs: GtfsCalendarSource, db: RawSqlDatabase | nu
     }
   }
 
+  // Frequency-based trips: the frequency rows are part of the content, so
+  // trips serving the same stops on different headways stay distinct. Trips
+  // without frequencies get no suffix — their keys are unchanged.
+  const freqByTrip = new Map<string, string[]>()
+  if (gtfs.getFrequencies) {
+    for (const f of await gtfs.getFrequencies()) {
+      if (!freqByTrip.has(f.trip_id)) freqByTrip.set(f.trip_id, [])
+      freqByTrip.get(f.trip_id)!.push(`${f.start_time}>${f.end_time}@${f.headway_secs}x${f.exact_times ?? 0}`)
+    }
+  }
+
   const contentKeys = new Map<string, string>()
-  for (const t of trips) contentKeys.set(t.trip_id, hash64(`${routeOf(t)} :: ${contentByTrip.get(t.trip_id) ?? ''}`))
+  for (const t of trips) {
+    const freq = freqByTrip.get(t.trip_id)
+    const freqPart = freq ? ` :: freq ${freq.sort().join(';')}` : ''
+    contentKeys.set(t.trip_id, hash64(`${routeOf(t)} :: ${contentByTrip.get(t.trip_id) ?? ''}${freqPart}`))
+  }
   return contentKeys
 }
 
@@ -295,32 +336,60 @@ async function loadFeedCalendar(
     tripsByService.get(t.service_id)!.push(t.trip_id)
   }
 
-  // 2. Feed range: per-service calendar bounds + type-1 exception dates.
-  // (There is no getFeedInfo()/list-services method; service ids come from
-  // the trips. Services without trips are invisible — they would not change
-  // any signature anyway.)
+  // 2. Two bulk reads: whole calendar and calendar_dates tables
+  const calendars = await gtfs.getCalendars()
+  const calendarDates = await gtfs.getCalendarDates()
+
+  // Feed range: calendar bounds + type-1 exception dates, restricted to
+  // services that have trips (a tripless service cannot change a signature,
+  // so it must not extend the range either)
   const bounds: string[] = []
-  for (const serviceId of tripsByService.keys()) {
-    const calendar = await gtfs.getCalendarByServiceId(serviceId)
-    if (calendar) bounds.push(gtfsDateToIso(calendar.start_date), gtfsDateToIso(calendar.end_date))
-    for (const e of await gtfs.getCalendarDates(serviceId)) {
-      if (e.exception_type === 1) bounds.push(gtfsDateToIso(e.date))
-    }
+  for (const c of calendars) {
+    if (tripsByService.has(c.service_id)) bounds.push(gtfsDateToIso(c.start_date), gtfsDateToIso(c.end_date))
+  }
+  for (const e of calendarDates) {
+    if (e.exception_type === 1 && tripsByService.has(e.service_id)) bounds.push(gtfsDateToIso(e.date))
   }
   if (bounds.length === 0) throw new Error('cannot determine the feed date range: no calendar and no type-1 calendar_dates')
   bounds.sort()
   let firstDay = bounds[0]
   let lastDay = bounds[bounds.length - 1]
+  if (options.useFeedInfo !== false && gtfs.getFeedInfo) {
+    for (const info of await gtfs.getFeedInfo()) {
+      const start = info.feed_start_date ? gtfsDateToIso(info.feed_start_date) : null
+      const end = info.feed_end_date ? gtfsDateToIso(info.feed_end_date) : null
+      if (start && start > firstDay) firstDay = start
+      if (end && end < lastDay) lastDay = end
+    }
+  }
   if (options.firstDay && options.firstDay > firstDay) firstDay = options.firstDay
   if (options.lastDay && options.lastDay < lastDay) lastDay = options.lastDay
   if (firstDay > lastDay) throw new Error(`empty analysed range: ${firstDay} > ${lastDay}`)
   const allDays = eachDay(firstDay, lastDay)
 
-  // 3. Active services per day: getActiveServiceIds already implements the
-  // calendar + calendar_dates logic — one call per day
+  // 3. Active services per day, computed in memory from the two tables
+  // (same semantics as gtfs-sqljs getActiveServiceIds: weekday bit within
+  // [start_date, end_date], then type 1 adds / type 2 removes — all
+  // services included, even tripless ones)
+  const exceptionsByDay = new Map<string, { service_id: string; exception_type: number }[]>()
+  for (const e of calendarDates) {
+    const day = gtfsDateToIso(e.date)
+    if (!exceptionsByDay.has(day)) exceptionsByDay.set(day, [])
+    exceptionsByDay.get(day)!.push(e)
+  }
   const servicesByDay = new Map<string, string[]>()
   for (const day of allDays) {
-    servicesByDay.set(day, (await gtfs.getActiveServiceIds(isoToGtfsDate(day))).sort())
+    const gtfsDate = isoToGtfsDate(day)
+    const dayField = DAY_FIELDS[weekdayOf(day)]
+    const active = new Set<string>()
+    for (const c of calendars) {
+      if (c[dayField] === 1 && c.start_date <= gtfsDate && c.end_date >= gtfsDate) active.add(c.service_id)
+    }
+    for (const e of exceptionsByDay.get(day) ?? []) {
+      if (e.exception_type === 1) active.add(e.service_id)
+      else if (e.exception_type === 2) active.delete(e.service_id)
+    }
+    servicesByDay.set(day, [...active].sort())
   }
 
   // 4. Equality key per trip: its trip_id, or the hash of its content

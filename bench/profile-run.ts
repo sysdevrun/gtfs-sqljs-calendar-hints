@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks'
 import { GtfsSqlJs } from 'gtfs-sqljs'
 import { createSqlJsAdapter } from 'gtfs-sqljs/adapters/sql-js'
 import { findCalendarPeriods, type Hint, type SignatureMode } from '../src/calendar-hints'
-import { publicHolidays, schoolVacationDays, schoolVacationRanges } from '../src/hints-france'
+import { publicHolidays, schoolVacationDays, schoolVacationRanges } from '../examples/hints-france'
 
 // performance.timeOrigin = démarrage du process : tout ce qui précède cette
 // ligne (node + tsx + résolution des imports, dont sql.js) est déjà écoulé.

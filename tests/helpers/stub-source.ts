@@ -17,12 +17,10 @@ export interface StubSpec {
   calendarDates?: [string, string, 1 | 2][]
   /** trip_id → trip (route 'R1' et direction 0 par défaut) */
   trips: Record<string, StubTrip>
-}
-
-// Index lundi-en-premier du jour de semaine d'une date GTFS (YYYYMMDD)
-function maskIndex(gtfsDate: string): number {
-  const iso = `${gtfsDate.slice(0, 4)}-${gtfsDate.slice(4, 6)}-${gtfsDate.slice(6, 8)}`
-  return (new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7
+  /** Lignes feed_info — expose getFeedInfo() seulement si présent */
+  feedInfo?: { feed_start_date?: string; feed_end_date?: string }[]
+  /** [trip_id, start_time, end_time, headway_secs, exact_times?] — expose getFrequencies() seulement si présent */
+  frequencies?: [string, string, string, number, number?][]
 }
 
 /** Construit un GtfsCalendarSource en mémoire à partir d'une description déclarative du feed. */
@@ -41,38 +39,37 @@ export function makeStubSource(spec: StubSpec): GtfsCalendarSource {
       }))
     },
 
-    async getCalendarByServiceId(serviceId) {
-      const mask = calendars[serviceId]
-      if (!mask || !range) return null
-      const bit = (i: number) => (mask[i] === '1' ? 1 : 0)
-      return {
-        service_id: serviceId,
-        monday: bit(0), tuesday: bit(1), wednesday: bit(2), thursday: bit(3),
-        friday: bit(4), saturday: bit(5), sunday: bit(6),
-        start_date: range.start, end_date: range.end,
-      }
-    },
-
-    async getCalendarDates(serviceId) {
-      return calendarDates
-        .filter(([service]) => service === serviceId)
-        .map(([service, date, type]) => ({ service_id: service, date, exception_type: type }))
-    },
-
-    async getActiveServiceIds(date) {
-      const active = new Set<string>()
-      if (range && range.start <= date && date <= range.end) {
-        for (const [id, mask] of Object.entries(calendars)) {
-          if (mask[maskIndex(date)] === '1') active.add(id)
+    async getCalendars() {
+      if (!range) return []
+      return Object.entries(calendars).map(([serviceId, mask]) => {
+        const bit = (i: number) => (mask[i] === '1' ? 1 : 0)
+        return {
+          service_id: serviceId,
+          monday: bit(0), tuesday: bit(1), wednesday: bit(2), thursday: bit(3),
+          friday: bit(4), saturday: bit(5), sunday: bit(6),
+          start_date: range.start, end_date: range.end,
         }
-      }
-      for (const [service, d, type] of calendarDates) {
-        if (d !== date) continue
-        if (type === 1) active.add(service)
-        else active.delete(service)
-      }
-      return [...active]
+      })
     },
+
+    async getCalendarDates() {
+      return calendarDates.map(([service, date, type]) => ({ service_id: service, date, exception_type: type }))
+    },
+
+    ...(spec.feedInfo && {
+      async getFeedInfo() {
+        return spec.feedInfo!
+      },
+    }),
+
+    ...(spec.frequencies && {
+      async getFrequencies() {
+        return spec.frequencies!.map(([trip, start, end, headway, exact]) => ({
+          trip_id: trip, start_time: start, end_time: end, headway_secs: headway,
+          ...(exact !== undefined && { exact_times: exact }),
+        }))
+      },
+    }),
 
     async getStopTimes(filters) {
       const requested = filters?.tripId

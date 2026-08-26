@@ -11,9 +11,10 @@ ajouter.**
   ré-exporter). Deux points d'entrée : `createCalendarAnalyzer` (charge le
   feed une fois ; `analyze(hints)` est un calcul pur en mémoire) et
   `findCalendarPeriods` (délègue à l'analyzer). Typage structurel
-  `GtfsCalendarSource` (5 méthodes `getXXXX`) ; fast-path SQL optionnel quand
-  la source expose `db` (option `fastPath`, repli automatique sur la voie
-  portable).
+  `GtfsCalendarSource` (4 méthodes `getXXXX` en vrac de gtfs-sqljs ≥ 0.9.0,
+  plus `getFeedInfo`/`getFrequencies` optionnelles) ; fast-path SQL optionnel
+  quand la source expose `db` (option `fastPath`, repli automatique sur la
+  voie portable).
 - `tests/` — vitest sur stub déclaratif (`tests/helpers/stub-source.ts`) +
   tests d'intégration contre le vrai gtfs-sqljs (fixtures CSV zippées en
   mémoire). Couverture attendue : 100 % sur `src/`.

@@ -2,6 +2,34 @@
 
 ## Upcoming release
 
+- **Breaking: `GtfsCalendarSource` now targets gtfs-sqljs ≥ 0.9.0.**
+  `getCalendarByServiceId(id)` and `getActiveServiceIds(date)` are no longer
+  used; the interface instead requires the bulk readers `getCalendars()` and
+  `getCalendarDates()` (no-arg). Service activation (weekday bit within
+  `[start_date, end_date]`, then type-1 adds / type-2 removes) is computed in
+  memory from those two tables — identical results, while the one-call-per-day
+  and two-calls-per-service round-trips (several hundred on a year-long feed)
+  collapse into two bulk reads. On Astuce (369 days), `trip-ids` drops from
+  109 ms to 45 ms with the fast path and from 143 ms to 74 ms on the portable
+  path; `trip-content` from 529 ms to 330 ms (fast) and 3.3 s to 2.3 s
+  (portable).
+- **`feed_info` clipping** (new option `useFeedInfo`, default `true`): when
+  the source exposes `getFeedInfo()` (gtfs-sqljs ≥ 0.9.0) and the feed
+  declares `feed_start_date`/`feed_end_date`, the analysed range is clipped
+  to that validity window — the spec-blessed fix for hollow feed tails that
+  previously required manual `firstDay`/`lastDay`. `useFeedInfo: false`
+  restores the previous behaviour.
+- **Frequency-aware `trip-content` signatures**: when the source exposes
+  `getFrequencies()` (gtfs-sqljs ≥ 0.9.0), a trip's frequency rows
+  (`start_time`, `end_time`, `headway_secs`, `exact_times`, order-insensitive)
+  are part of its content, so two trips serving the same stops on different
+  headways no longer merge. Trips without frequencies keep the exact same
+  signatures as before.
+- Engines: Node ≥ 20 (aligned with gtfs-sqljs 0.9.0; Node 18 is EOL).
+- Internal: the `bench/` scripts import `hints-france` from `examples/` again
+  (broken path since the runners moved), and the demo website is bumped to
+  gtfs-sqljs ^0.9.0 (it type-checks the library sources directly).
+
 ## 0.2.0
 
 - Reusable analyzer: `createCalendarAnalyzer(gtfs, options)` loads the feed
