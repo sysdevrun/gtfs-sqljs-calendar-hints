@@ -12,7 +12,8 @@ npm install gtfs-sqljs-calendar-hints
 ```
 
 Zéro dépendance ; conçu pour [gtfs-sqljs](https://www.npmjs.com/package/gtfs-sqljs)
-(typage structurel : toute source implémentant 5 méthodes `getXXXX` convient).
+≥ 0.9.0 (typage structurel : toute source implémentant 4 méthodes `getXXXX`
+convient, plus 2 optionnelles).
 
 ## Démo en ligne
 
@@ -79,10 +80,13 @@ Sur Car Jaune, `trip-ids` classe 254/350 jours ; `trip-content` classe
 ## Librairie : `findCalendarPeriods` sur gtfs-sqljs (sans SQL brut)
 
 `src/calendar-hints.ts` implémente l'algorithme au-dessus d'une instance
-[gtfs-sqljs](https://www.npmjs.com/package/gtfs-sqljs), **uniquement via les
-méthodes `getXXXX`** — aucune requête SQL brute. Le paramètre est typé
-structurellement (`GtfsCalendarSource`) : cinq méthodes suffisent, donc un
-stub de test fonctionne aussi.
+[gtfs-sqljs](https://www.npmjs.com/package/gtfs-sqljs) **≥ 0.9.0**, via ses
+méthodes `getXXXX` en vrac. Le paramètre est typé structurellement
+(`GtfsCalendarSource`) : quatre méthodes suffisent (plus deux optionnelles),
+donc un stub de test fonctionne aussi. Un fast-path SQL optionnel (option
+`fastPath`, activé par défaut) accélère les deux lectures massives quand la
+source expose sa base gtfs-sqljs, avec repli automatique sur la voie
+portable.
 
 La librairie n'a **aucune dépendance** : les jours fériés et les vacances
 scolaires sont fournis par l'appelant, sous forme de listes de dates ISO dans
@@ -90,25 +94,21 @@ les `days` des hints. Voir « Générer les jours des hints » ci-dessous pour
 les sources recommandées, et `examples/hints-france.ts` pour un générateur
 d'exemple (utilisé par les runners de ce dépôt).
 
-| Besoin de l'algorithme | Méthode gtfs-sqljs |
+| Besoin de l'algorithme | Méthode gtfs-sqljs (≥ 0.9.0) |
 | --- | --- |
 | Tous les trips + route/direction/service | `getTrips()` sans filtre (1 appel) |
-| Bornes du feed | `getCalendarByServiceId(id)` + `getCalendarDates(id)` par service (dates de début/fin + exceptions type 1) |
-| Services actifs par jour | `getActiveServiceIds('YYYYMMDD')` (1 appel/jour — la lib implémente déjà toute la logique calendar + calendar_dates) |
+| Bornes du feed + services actifs par jour | `getCalendars()` + `getCalendarDates()` (2 appels pour tout le calendrier) ; l'activation par jour — bit du jour dans `[start_date, end_date]`, puis exceptions type 1/2 — est calculée en mémoire |
+| Fenêtre de validité (optionnel) | `getFeedInfo()` : la plage analysée est bornée à `feed_start_date`/`feed_end_date` (désactivable via `useFeedInfo: false`) |
 | Contenu des trips (mode `trip-content`) | `getStopTimes({ tripId: [...] })` par lots de 500 (les filtres acceptent les tableaux) ; tri par `stop_sequence` côté appelant |
+| Trips à fréquence (optionnel, mode `trip-content`) | `getFrequencies()` : les lignes de fréquence font partie du contenu du trip — même desserte mais headway différent ⇒ signatures distinctes |
 
-Constats de l'évaluation :
+Constats :
 
-- **Tout est faisable sans SQL brut.** `getActiveServiceIds` évite même de
-  réimplémenter l'activation des services.
-- Il n'existe ni `getCalendars()` (liste complète) ni `getFeedInfo()` : les
-  `service_id` sont donc dérivés de `getTrips()`. Un service sans trip est
-  invisible — sans effet sur les signatures, mais il ne peut pas étendre la
-  plage du feed (c'est plutôt sain).
-- Performances mesurées (sql.js en mémoire, Node) : Car Jaune 55 ms
-  (`trip-ids`) / 170 ms (`trip-content`) ; Astuce (24 873 trips, 650 000
-  stop_times) 189 ms / 2,3 s — le mode contenu est dominé par les
-  `getStopTimes` par lots.
+- **Tout est faisable sans SQL brut**, et depuis gtfs-sqljs 0.9.0 sans le
+  moindre appel par service ou par jour : deux lectures en vrac du calendrier
+  remplacent les centaines d'allers-retours des versions précédentes.
+- Un service sans trip reste sans effet sur les signatures et ne peut pas
+  étendre la plage du feed (c'est plutôt sain).
 - Validation croisée : les deux implémentations (lecture CSV directe
   `examples/run.ts` et gtfs-sqljs `examples/run-gtfs-sqljs.ts`) produisent des
   résultats identiques sur les 5 réseaux (mêmes signatures, mêmes groupes,
@@ -133,9 +133,12 @@ result.periods       // groupes fusionnés par signature = les "périodes"
 result.unclassified  // jours restants, groupés par signature
 ```
 
-Options : `signatureMode` (`'trip-ids'` par défaut) et `firstDay`/`lastDay`
+Options : `signatureMode` (`'trip-ids'` par défaut) ; `firstDay`/`lastDay`
 pour restreindre la plage analysée (utile contre les queues de feed creuses,
-edge case 18).
+edge case 18) ; `useFeedInfo` (`true` par défaut : la plage est bornée à la
+fenêtre de validité `feed_info` quand le feed la déclare) ; `fastPath`
+(`true` par défaut : requêtes SQL brutes en lecture seule quand la source
+expose sa base gtfs-sqljs, repli automatique sur les `getXXXX` sinon).
 
 ### Attributs personnalisés sur les hints
 

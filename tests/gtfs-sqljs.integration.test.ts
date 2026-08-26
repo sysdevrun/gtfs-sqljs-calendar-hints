@@ -61,6 +61,42 @@ describe('integration: base feed through gtfs-sqljs', () => {
   })
 })
 
+describe('integration: feed_info + frequencies feed (gtfs-sqljs ≥ 0.9)', () => {
+  // Une semaine 2026-01-05 → 2026-01-11 au calendrier, mais feed_info borne
+  // la validité au vendredi 09. F1 (lun-mar) et F2 (jeu-ven) ont des
+  // stop_times identiques et ne diffèrent QUE par le headway de
+  // frequencies.txt ; W1 circule le week-end, hors validité.
+  let gtfs: GtfsSqlJs
+
+  beforeAll(async () => {
+    gtfs = await GtfsSqlJs.fromZipData(fixtureZip('freq'), { adapter: await createSqlJsAdapter() })
+  })
+  afterAll(async () => {
+    await gtfs.close()
+  })
+
+  it('clips the analysed range to the feed_info validity window', async () => {
+    const result = await findCalendarPeriods(gtfs, [])
+    expect(result.firstDay).toBe('2026-01-05')
+    expect(result.lastDay).toBe('2026-01-09')
+    expect(result.days).toHaveLength(5)
+  })
+
+  it('useFeedInfo: false analyses the whole calendar range', async () => {
+    const result = await findCalendarPeriods(gtfs, [], { useFeedInfo: false })
+    expect(result.lastDay).toBe('2026-01-11')
+    expect(result.days.find(d => d.date === '2026-01-10')?.serviceIds).toEqual(['WE'])
+  })
+
+  it('trip-content keeps trips apart when only their headways differ', async () => {
+    const result = await findCalendarPeriods(gtfs, [], { signatureMode: 'trip-content' })
+    // lun-mar (F1, 10 min), mer fermé, jeu-ven (F2, 15 min) : sans les
+    // frequencies dans la signature, les 4 jours roulants fusionneraient
+    expect(result.periods).toHaveLength(3)
+    expect(result.periods.map(p => p.days.length).sort()).toEqual([1, 2, 2])
+  })
+})
+
 describe('integration: field-quirks feed (dates-only, BOM, alphabetical columns, ids with spaces)', () => {
   // 2 semaines scolaires (2026-01-05 → 2026-01-16) : services « service
   // semaine A » et « service semaine B » définis uniquement par exceptions

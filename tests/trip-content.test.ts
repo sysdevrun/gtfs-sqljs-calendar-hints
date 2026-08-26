@@ -50,6 +50,48 @@ describe('trip-content signature mode', () => {
     expect(await periodCount(spec)).toBe(3) // contenus toujours identiques → fusionnés
   })
 
+  it('merges trips carrying identical frequencies', async () => {
+    const spec = twoWeekSpec()
+    spec.frequencies = [
+      ['S1', '09:00:00', '12:00:00', 600],
+      ['H1', '09:00:00', '12:00:00', 600],
+    ]
+    expect(await periodCount(spec)).toBe(3) // toujours fusionnés
+  })
+
+  it('does not merge identical stops on different headways', async () => {
+    const spec = twoWeekSpec()
+    spec.frequencies = [
+      ['S1', '09:00:00', '12:00:00', 600],
+      ['H1', '09:00:00', '12:00:00', 900],
+    ]
+    expect(await periodCount(spec)).toBe(4)
+  })
+
+  it('does not merge a frequency-based trip with a fixed-schedule one', async () => {
+    const spec = twoWeekSpec()
+    spec.frequencies = [['H1', '09:00:00', '12:00:00', 600]]
+    expect(await periodCount(spec)).toBe(4)
+  })
+
+  it('treats a missing exact_times as 0 (spec default)', async () => {
+    const spec = twoWeekSpec()
+    spec.frequencies = [
+      ['S1', '09:00:00', '12:00:00', 600, 0],
+      ['H1', '09:00:00', '12:00:00', 600], // exact_times absent
+    ]
+    expect(await periodCount(spec)).toBe(3)
+  })
+
+  it('is insensitive to the delivery order of frequency rows', async () => {
+    const spec = twoWeekSpec()
+    spec.frequencies = [
+      ['S1', '09:00:00', '12:00:00', 600], ['S1', '14:00:00', '18:00:00', 1200],
+      ['H1', '14:00:00', '18:00:00', 1200], ['H1', '09:00:00', '12:00:00', 600],
+    ]
+    expect(await periodCount(spec)).toBe(3)
+  })
+
   it('merges trips without any stop_times when route and direction are equal', async () => {
     const spec: StubSpec = {
       range: { start: '20260105', end: '20260118' },

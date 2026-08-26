@@ -9,7 +9,7 @@ import {
   createCalendarAnalyzer, findCalendarPeriods,
   type CalendarHintsOptions, type Hint, type SignatureMode, type GtfsCalendarSource,
 } from '../src/calendar-hints'
-import { publicHolidays, schoolVacationDays } from '../src/hints-france'
+import { publicHolidays, schoolVacationDays } from '../examples/hints-france'
 
 interface MethodStat { calls: number; ms: number; rows: number }
 type RawStmt = { step(): Promise<boolean>; getAsObject(): Promise<Record<string, unknown>>; free(): Promise<void>; bind?(p: unknown[]): Promise<void> }
@@ -68,10 +68,11 @@ function instrument(gtfs: GtfsSqlJs): { source: GtfsCalendarSource; stats: Map<s
     reset: () => stats.clear(),
     source: {
       getTrips: wrap('getTrips', gtfs.getTrips.bind(gtfs)),
-      getCalendarByServiceId: wrap('getCalendarByServiceId', gtfs.getCalendarByServiceId.bind(gtfs)),
+      getCalendars: wrap('getCalendars', gtfs.getCalendars.bind(gtfs)),
       getCalendarDates: wrap('getCalendarDates', gtfs.getCalendarDates.bind(gtfs)),
-      getActiveServiceIds: wrap('getActiveServiceIds', gtfs.getActiveServiceIds.bind(gtfs)),
       getStopTimes: wrap('getStopTimes', gtfs.getStopTimes.bind(gtfs)),
+      getFeedInfo: wrap('getFeedInfo', gtfs.getFeedInfo.bind(gtfs)),
+      getFrequencies: wrap('getFrequencies', gtfs.getFrequencies.bind(gtfs)),
       db: instrumentedDb,
     } as GtfsCalendarSource,
   }

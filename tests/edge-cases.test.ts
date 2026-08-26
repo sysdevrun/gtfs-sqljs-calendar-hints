@@ -120,6 +120,46 @@ describe('feeds without calendar.txt (dates-only)', () => {
   })
 })
 
+describe('feed_info clipping', () => {
+  it('clips the analysed range to the feed validity window by default', async () => {
+    const spec = twoWeekSpec()
+    spec.feedInfo = [{ feed_start_date: '20260107', feed_end_date: '20260116' }]
+    const result = await findCalendarPeriods(makeStubSource(spec), [])
+    expect(result.firstDay).toBe('2026-01-07')
+    expect(result.lastDay).toBe('2026-01-16')
+  })
+
+  it('useFeedInfo: false analyses the full calendar range', async () => {
+    const spec = twoWeekSpec()
+    spec.feedInfo = [{ feed_start_date: '20260107', feed_end_date: '20260116' }]
+    const result = await findCalendarPeriods(makeStubSource(spec), [], { useFeedInfo: false })
+    expect(result.firstDay).toBe('2026-01-05')
+    expect(result.lastDay).toBe('2026-01-18')
+  })
+
+  it('only narrows: a window wider than the calendar changes nothing', async () => {
+    const spec = twoWeekSpec()
+    spec.feedInfo = [{ feed_start_date: '20251201', feed_end_date: '20260731' }]
+    const result = await findCalendarPeriods(makeStubSource(spec), [])
+    expect(result.firstDay).toBe('2026-01-05')
+    expect(result.lastDay).toBe('2026-01-18')
+  })
+
+  it('ignores feed_info rows without dates (optional fields)', async () => {
+    const spec = twoWeekSpec()
+    spec.feedInfo = [{}]
+    const result = await findCalendarPeriods(makeStubSource(spec), [])
+    expect(result.firstDay).toBe('2026-01-05')
+    expect(result.lastDay).toBe('2026-01-18')
+  })
+
+  it('throws when the feed validity window empties the range', async () => {
+    const spec = twoWeekSpec()
+    spec.feedInfo = [{ feed_start_date: '20260601', feed_end_date: '20260630' }]
+    await expect(findCalendarPeriods(makeStubSource(spec), [])).rejects.toThrow(/empty analysed range/)
+  })
+})
+
 describe('errors', () => {
   it('throws when no range can be derived (no calendar, no type-1 dates)', async () => {
     const empty = makeStubSource({ calendarDates: [['X', '20260105', 2]], trips: { T1: { service: 'X' } } })
@@ -152,6 +192,25 @@ describe('mismatch details', () => {
     expect(m.dayA).toBe('2026-01-05')
     expect(m.message).toContain('8 distinct signatures')
     expect(m.message).toContain('… 2 more')
+  })
+})
+
+describe('fast path', () => {
+  it('falls back to the portable path when every raw SQL query fails', async () => {
+    const broken = Object.assign(makeStubSource(twoWeekSpec()), {
+      db: { prepare: async () => { throw new Error('SQLite too old') } },
+    })
+    const result = await findCalendarPeriods(broken, [HOLIDAYS], { signatureMode: 'trip-content' })
+    const clean = await findCalendarPeriods(makeStubSource(twoWeekSpec()), [HOLIDAYS], { signatureMode: 'trip-content' })
+    expect(result).toEqual(clean)
+  })
+
+  it('fastPath: false ignores a db property entirely', async () => {
+    const withDb = Object.assign(makeStubSource(twoWeekSpec()), {
+      db: { prepare: async () => { throw new Error('must not be called') } },
+    })
+    const result = await findCalendarPeriods(withDb, [HOLIDAYS], { signatureMode: 'trip-content', fastPath: false })
+    expect(result.hintResults[0].matched).toBe(true)
   })
 })
 

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { GtfsSqlJs } from 'gtfs-sqljs'
 import { createSqlJsAdapter } from 'gtfs-sqljs/adapters/sql-js'
 import { findCalendarPeriods, type Hint, type SignatureMode } from '../src/calendar-hints'
-import { publicHolidays, schoolVacationDays } from '../src/hints-france'
+import { publicHolidays, schoolVacationDays } from '../examples/hints-france'
 
 const zipPath = process.argv[2] ?? 'feeds/astuce.zip'
 const gtfs = await GtfsSqlJs.fromZipData(readFileSync(zipPath).buffer as ArrayBuffer, {
