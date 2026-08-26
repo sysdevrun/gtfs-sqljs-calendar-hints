@@ -162,7 +162,7 @@ export default function App() {
           scolaires générés automatiquement. Tout tourne dans le navigateur
           (<a href="https://www.npmjs.com/package/gtfs-sqljs">gtfs-sqljs</a> + Web Worker),
           les GTFS sont téléchargés via le proxy CORS de SysDevRun.{' '}
-          <a href="https://github.com/sysdevrun/gtfs-sqljs-calendars-hints">Code source</a>
+          <a href="https://github.com/sysdevrun/gtfs-sqljs-calendar-hints">Code source</a>
         </p>
       </header>
 

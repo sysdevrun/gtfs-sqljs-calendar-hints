@@ -21,7 +21,7 @@ tourner la librairie dans le navigateur : sélection d'un GTFS
 (react-gtfs-selector + proxy CORS SysDevRun), boutons 1-clic pour Car Jaune,
 Kar'Ouest, Citalis, Estival, CarSud et Astuce (Rouen), génération automatique
 des hints et visualisation des périodes détectées. Déployé sur GitHub Pages :
-<https://sysdevrun.github.io/gtfs-sqljs-calendars-hints/>
+<https://sysdevrun.github.io/gtfs-sqljs-calendar-hints/>
 
 ## Entrées
 
