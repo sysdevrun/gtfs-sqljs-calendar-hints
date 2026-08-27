@@ -2,6 +2,10 @@
 
 ## Upcoming release
 
+- Demo: the calendar grid now underlines school-vacation days (Sundays
+  excluded) and marks public holidays with an asterisk next to the day
+  number; both are also spelled out in each day's tooltip.
+
 - Demo & examples: fix the school-vacation date rules derived from the
   `fr-en-calendrier-scolaire` dataset. Its timestamps are Paris-midnight
   instants serialized in UTC (`2026-10-09T22:00:00+00:00`); they are now

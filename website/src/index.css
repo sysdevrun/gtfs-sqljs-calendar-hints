@@ -465,6 +465,12 @@ code {
   background: transparent;
 }
 
+/* Vacances scolaires (hors dimanche) : numéro souligné */
+.calendar-day-vacation {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* La couleur et le motif disent le type de jour ; le liseré pointillé dit
    qu'aucun hint n'a réclamé ce jour-là. */
 .calendar-day-unclassified {

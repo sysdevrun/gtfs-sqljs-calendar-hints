@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { CalendarHintsResult, HintResult, Period } from '../../../src/calendar-hints'
 import { buildDayTypes, dayTypeBackground, frLabel, type DayTypeStyle } from '../day-types'
+import { eachDay, type GeneratedHints } from '../hints'
 import CalendarGrid from './CalendarGrid'
 
 const WEEKDAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
@@ -59,7 +60,10 @@ function PeriodCard({ period, style }: { period: Period; style: DayTypeStyle }) 
   )
 }
 
-export default function ResultsView({ result }: { result: CalendarHintsResult }) {
+export default function ResultsView({ result, generated }: {
+  result: CalendarHintsResult
+  generated: GeneratedHints
+}) {
   // Périodes dans l'ordre des hints (puis des jours restants), pas par taille
   const orderedPeriods = useMemo(() => {
     const order = new Map<string, number>()
@@ -77,6 +81,17 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
   // les cartes ci-dessous), puis les signatures restées non classées.
   const dayTypes = useMemo(() => buildDayTypes(result, orderedPeriods), [result, orderedPeriods])
   const unclassifiedCount = result.unclassified.reduce((n, g) => n + g.days.length, 0)
+  const holidays = useMemo(() => new Set(generated.holidays.map(h => h.date)), [generated])
+  // Tous les jours des périodes de vacances, dimanches exclus
+  const vacationDays = useMemo(
+    () =>
+      new Set(
+        generated.vacationRanges
+          .flatMap(v => eachDay(v.first, v.last))
+          .filter(d => weekdayOf(d) !== 0),
+      ),
+    [generated],
+  )
 
   return (
     <>
@@ -100,8 +115,10 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
           Chaque jour est peint selon son <strong>type de jour</strong> : deux jours qui font
           tourner exactement les mêmes courses partagent la même couleur et le même motif —
           y compris les jours qu'aucun hint n'a classés, entourés de pointillés.
+          Les jours de <u>vacances scolaires</u> (hors dimanche) sont soulignés, les jours
+          fériés marqués d'un astérisque*.
         </p>
-        <CalendarGrid result={result} dayTypes={dayTypes} />
+        <CalendarGrid result={result} dayTypes={dayTypes} holidays={holidays} vacationDays={vacationDays} />
       </section>
 
       <section className="card">

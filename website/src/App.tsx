@@ -392,7 +392,7 @@ export default function App() {
             </p>
             <HintsView generated={analysis.generated} />
           </section>
-          <ResultsView result={analysis.result} />
+          <ResultsView result={analysis.result} generated={analysis.generated} />
         </>
       )}
     </div>

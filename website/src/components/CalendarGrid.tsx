@@ -13,6 +13,10 @@ interface DayCell {
   type: DayType
   /** Aucun hint (ni la passe finale par jour de semaine) n'a classé ce jour */
   unclassified: boolean
+  /** Jour férié : astérisque à côté du numéro */
+  holiday: boolean
+  /** Vacances scolaires (hors dimanche) : numéro souligné */
+  vacation: boolean
 }
 
 interface Month {
@@ -22,9 +26,13 @@ interface Month {
   cells: (DayCell | null)[]
 }
 
-export default function CalendarGrid({ result, dayTypes }: {
+export default function CalendarGrid({ result, dayTypes, holidays, vacationDays }: {
   result: CalendarHintsResult
   dayTypes: DayTypes
+  /** Dates ISO des jours fériés */
+  holidays: Set<string>
+  /** Dates ISO des jours de vacances scolaires, dimanches exclus */
+  vacationDays: Set<string>
 }) {
   const months = useMemo<Month[]>(() => {
     const months: Month[] = []
@@ -44,10 +52,12 @@ export default function CalendarGrid({ result, dayTypes }: {
         date: day.date,
         type: dayTypes.bySignature.get(day.signature)!,
         unclassified: dayTypes.unclassifiedDates.has(day.date),
+        holiday: holidays.has(day.date),
+        vacation: vacationDays.has(day.date),
       })
     }
     return months
-  }, [result, dayTypes])
+  }, [result, dayTypes, holidays, vacationDays])
 
   return (
     <>
@@ -67,11 +77,16 @@ export default function CalendarGrid({ result, dayTypes }: {
                     style={{ background: dayTypeBackground(cell.type.style) }}
                     title={
                       `${cell.date} — ${cell.type.label} — ${cell.type.tripCount} courses` +
+                      `${cell.holiday ? ' — férié' : ''}` +
+                      `${cell.vacation ? ' — vacances scolaires' : ''}` +
                       `${cell.unclassified && cell.type.label !== 'non classé' ? ' (jour non classé)' : ''}` +
                       ` — signature ${cell.type.signature}`
                     }
                   >
-                    {Number(cell.date.slice(8, 10))}
+                    <span className={cell.vacation ? 'calendar-day-vacation' : undefined}>
+                      {Number(cell.date.slice(8, 10))}
+                    </span>
+                    {cell.holiday && '*'}
                   </div>
                 ) : (
                   <div key={`empty-${i}`} className="calendar-day calendar-day-empty" />
