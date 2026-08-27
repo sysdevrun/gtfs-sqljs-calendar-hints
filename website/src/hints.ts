@@ -75,14 +75,39 @@ export function publicHolidays(zone: HolidayZone, firstDay: string, lastDay: str
 
 // ---------------------------------------------------------------------------
 // Vacances scolaires (dataset fr-en-calendrier-scolaire, cf. school-calendar.ts)
-// Convention du jeu de données : start_date = dernier jour de classe,
-// end_date = dernier jour de vacances (reprise le lendemain matin).
+//
+// L'API renvoie des timestamps « minuit heure de Paris » sérialisés en UTC
+// (`2026-10-09T22:00:00+00:00`), y compris pour les zones ultramarines : la
+// date calendaire officielle est la date *à Paris* de cet instant, jamais
+// celle du fuseau local (aux Antilles, UTC−4, la conversion locale rendrait
+// la veille). `officialDate` ajoute 12 h avant de tronquer en UTC — l'offset
+// de Paris étant toujours dans ±12 h, cela rend la date parisienne quel que
+// soit l'offset de sérialisation, sans table de fuseaux.
+//
+// Convention du jeu de données, en dates officielles :
+// - start_date = jour du départ en vacances, après la dernière heure de cours ;
+// - end_date   = jour de la rentrée, le matin.
+// Le premier jour de vacances est donc le lendemain du départ — sauf départ un
+// samedi ou un mercredi, jours sans cours pour la plupart des élèves (le
+// départ réel a lieu la veille au soir), qui comptent alors comme vacances.
+// Le dernier jour de vacances est la veille de la rentrée.
 // ---------------------------------------------------------------------------
 export interface VacationRange {
   label: string
   first: string
   last: string
 }
+
+export interface VacationOptions {
+  /** Départ publié un mercredi ou un samedi : ce jour compte-t-il comme
+   *  vacances ? `true` par défaut (pas de cours ce jour-là) ; `false` le
+   *  traite comme les autres jours — vacances à partir du lendemain. */
+  includeWedSatStart?: boolean
+}
+
+/** Date officielle (heure de Paris) d'un timestamp du dataset. */
+export const officialDate = (timestamp: string) =>
+  new Date(new Date(timestamp).getTime() + 12 * 3600 * 1000).toISOString().slice(0, 10)
 
 // Les grandes vacances sont publiées en double, « Élèves » et « Enseignants »,
 // à un jour d'écart : seule la version élèves nous intéresse. Le champ
@@ -96,19 +121,28 @@ export function schoolVacationRanges(
   records: SchoolCalendarRecord[],
   firstDay: string,
   lastDay: string,
+  { includeWedSatStart = true }: VacationOptions = {},
 ): VacationRange[] {
   const sundayAfter = (d: string) => addDays(d, (7 - weekdayOf(d)) % 7)
+  const firstVacationDay = (departure: string) => {
+    const wd = weekdayOf(departure)
+    return includeWedSatStart && (wd === 3 || wd === 6) ? departure : addDays(departure, 1)
+  }
   return records
     .filter(r => !isTeachersOnly(r.population))
     .map(r => {
-      const start = r.start_date.slice(0, 10)
-      const end = r.end_date.slice(0, 10)
+      const start = officialDate(r.start_date)
+      const end = officialDate(r.end_date)
       const label = `${r.description} ${r.annee_scolaire}`
-      // « Début des Vacances … » : pas de fin publiée, on va jusqu'à la fin du feed
-      if (r.description.startsWith('Début')) return { label, first: addDays(start, 1), last: lastDay }
-      // « Pont de l'Ascension » : le férié lui-même ouvre le pont, jusqu'au dimanche
-      if (r.description.startsWith('Pont')) return { label, first: start, last: end > sundayAfter(start) ? end : sundayAfter(start) }
-      return { label, first: addDays(start, 1), last: end }
+      // « Début des Vacances … » : pas de rentrée publiée, on va jusqu'à la fin du feed
+      if (r.description.startsWith('Début')) return { label, first: firstVacationDay(start), last: lastDay }
+      // « Pont de l'Ascension » : le jour publié est déjà chômé (l'Ascension,
+      // ou le vendredi qui la suit), et le pont court au moins jusqu'au dimanche
+      if (r.description.startsWith('Pont')) {
+        const beforeReturn = addDays(end, -1)
+        return { label, first: start, last: beforeReturn > sundayAfter(start) ? beforeReturn : sundayAfter(start) }
+      }
+      return { label, first: firstVacationDay(start), last: addDays(end, -1) }
     })
     .filter(v => v.last >= firstDay && v.first <= lastDay)
     .sort((a, b) => a.first.localeCompare(b.first))
@@ -182,9 +216,10 @@ export function generateHints(
   firstDay: string,
   lastDay: string,
   configs: HintConfig[] = DEFAULT_HINT_CONFIGS,
+  vacationOptions: VacationOptions = {},
 ): GeneratedHints {
   const holidays = publicHolidays(zone, firstDay, lastDay)
-  const vacationRanges = schoolVacationRanges(schoolRecords, firstDay, lastDay)
+  const vacationRanges = schoolVacationRanges(schoolRecords, firstDay, lastDay, vacationOptions)
   const daysOf = (c: HintConfig): string[] => {
     if (c.source === 'holidays') return holidays.map(h => h.date)
     if (c.source === 'school-vacations') return vacationDaysOf(vacationRanges)

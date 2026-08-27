@@ -31,6 +31,8 @@ interface Settings {
   firstDay: string
   lastDay: string
   hintConfigs: HintConfig[]
+  /** Départ en vacances un mercredi ou un samedi : jour de vacances ? */
+  includeWedSatStart: boolean
 }
 
 const SELECTOR_TABS = [fileTab, urlTab, transportDataGouvFr, mobilityDataCsv]
@@ -42,6 +44,7 @@ const DEFAULT_SETTINGS: Settings = {
   firstDay: '',
   lastDay: '',
   hintConfigs: DEFAULT_HINT_CONFIGS,
+  includeWedSatStart: true,
 }
 
 interface Analysis {
@@ -109,6 +112,7 @@ export default function App() {
         probe.firstDay,
         probe.lastDay,
         s.hintConfigs,
+        { includeWedSatStart: s.includeWedSatStart },
       )
       // …puis l'analyse complète dans le mode choisi.
       const result = await worker.analyze(generated.hints, { signatureMode: s.mode, ...clip })
@@ -254,6 +258,22 @@ export default function App() {
           </label>
         </div>
         <h3>Vacances scolaires</h3>
+        <div className="settings-row">
+          <label>
+            Départ un mercredi ou un samedi
+            <select value={settings.includeWedSatStart ? 'include' : 'exclude'} disabled={busy}
+              onChange={e => updateSetting('includeWedSatStart', e.target.value === 'include')}>
+              <option value="include">jour de vacances (pas de cours ce jour-là)</option>
+              <option value="exclude">jour de cours — vacances le lendemain</option>
+            </select>
+          </label>
+        </div>
+        <p className="small muted">
+          Le calendrier officiel publie le jour du <em>départ</em> (dernière heure de cours) et
+          celui de la <em>rentrée</em> : les vacances vont du lendemain du départ à la veille de
+          la rentrée. Un départ publié un mercredi ou un samedi est, par défaut, déjà un jour de
+          vacances — la plupart des élèves n'ont pas cours ce jour-là.
+        </p>
         {!calendar ? (
           <div className="school-calendar">
             <p className="muted">

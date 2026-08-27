@@ -19,35 +19,60 @@ export const NETWORKS: Record<string, NetworkConfig> = {
   'astuce': { dir: 'feeds/astuce', zip: 'feeds/astuce.zip', academy: 'Normandie' },
 }
 
-// Calendrier scolaire officiel. Convention du jeu de données : start_date =
-// dernier jour de classe (les vacances commencent le soir), end_date =
-// dernier jour de vacances (reprise le lendemain matin).
+// Calendrier scolaire officiel. L'API renvoie des timestamps « minuit heure
+// de Paris » sérialisés en UTC (`2026-10-09T22:00:00+00:00`), y compris pour
+// l'outre-mer : la date officielle est la date à Paris de cet instant (+12 h
+// puis troncature UTC, robuste quel que soit l'offset de sérialisation).
+// Convention du jeu de données, en dates officielles : start_date = jour du
+// départ en vacances (après la dernière heure de cours), end_date = jour de
+// la rentrée (le matin).
 const schoolCalendar = JSON.parse(readFileSync('data/school-calendar.json', 'utf8')) as {
   results: { description: string; population: string; start_date: string; end_date: string; location: string; annee_scolaire: string }[]
 }
 
-export function schoolVacationRanges(academy: string, firstDay: string, lastDay: string): { label: string; first: string; last: string }[] {
+const officialDate = (timestamp: string) =>
+  new Date(new Date(timestamp).getTime() + 12 * 3600 * 1000).toISOString().slice(0, 10)
+
+export interface VacationOptions {
+  /** Départ publié un mercredi ou un samedi : jour de vacances ? `true` par
+   *  défaut (pas de cours ce jour-là) ; `false` = vacances le lendemain. */
+  includeWedSatStart?: boolean
+}
+
+export function schoolVacationRanges(
+  academy: string,
+  firstDay: string,
+  lastDay: string,
+  { includeWedSatStart = true }: VacationOptions = {},
+): { label: string; first: string; last: string }[] {
   const sundayAfter = (iso: string) => addDays(iso, (7 - weekdayOf(iso)) % 7)
+  const firstVacationDay = (departure: string) => {
+    const wd = weekdayOf(departure)
+    return includeWedSatStart && (wd === 3 || wd === 6) ? departure : addDays(departure, 1)
+  }
   return schoolCalendar.results
     .filter(r => r.location === academy && (r.population === '-' || r.population === 'Élèves'))
     .map(r => {
-      const start = r.start_date.slice(0, 10)
-      const end = r.end_date.slice(0, 10)
+      const start = officialDate(r.start_date)
+      const end = officialDate(r.end_date)
       const label = `${r.description} ${r.annee_scolaire}`
-      // « Début des Vacances … » : pas de fin publiée, on va jusqu'à la fin du feed
-      if (r.description.startsWith('Début')) return { label, first: addDays(start, 1), last: lastDay }
-      // « Pont de l'Ascension » : le jour férié lui-même ouvre le pont, jusqu'au dimanche
-      if (r.description.startsWith('Pont')) return { label, first: start, last: end > sundayAfter(start) ? end : sundayAfter(start) }
-      return { label, first: addDays(start, 1), last: end }
+      // « Début des Vacances … » : pas de rentrée publiée, on va jusqu'à la fin du feed
+      if (r.description.startsWith('Début')) return { label, first: firstVacationDay(start), last: lastDay }
+      // « Pont de l'Ascension » : le jour publié est déjà chômé, jusqu'au dimanche au moins
+      if (r.description.startsWith('Pont')) {
+        const beforeReturn = addDays(end, -1)
+        return { label, first: start, last: beforeReturn > sundayAfter(start) ? beforeReturn : sundayAfter(start) }
+      }
+      return { label, first: firstVacationDay(start), last: addDays(end, -1) }
     })
     .filter(v => v.last >= firstDay && v.first <= lastDay)
     .sort((a, b) => a.first.localeCompare(b.first))
 }
 
 /** Jours de vacances scolaires, du lundi au vendredi uniquement. */
-export function schoolVacationDays(academy: string, firstDay: string, lastDay: string): string[] {
+export function schoolVacationDays(academy: string, firstDay: string, lastDay: string, options: VacationOptions = {}): string[] {
   const isMonToFri = (d: string) => weekdayOf(d) >= 1 && weekdayOf(d) <= 5
-  const ranges = schoolVacationRanges(academy, firstDay, lastDay)
+  const ranges = schoolVacationRanges(academy, firstDay, lastDay, options)
   return [...new Set(ranges.flatMap(v => eachDay(v.first, v.last)))].filter(isMonToFri).sort()
 }
 
