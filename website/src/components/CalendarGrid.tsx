@@ -97,6 +97,11 @@ export default function CalendarGrid({ result, dayTypes, holidays, vacationDays 
         ))}
       </div>
 
+      <div className="calendar-marks-legend muted small">
+        <span><span className="calendar-mark-sample calendar-day-vacation">15</span> vacances scolaires (hors dimanche)</span>
+        <span><span className="calendar-mark-sample">15*</span> jour férié</span>
+      </div>
+
       <div className="day-type-legend">
         {dayTypes.list.map(type => (
           <div key={type.signature} className="day-type-item">

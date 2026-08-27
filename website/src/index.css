@@ -471,6 +471,19 @@ code {
   text-underline-offset: 2px;
 }
 
+/* Légende des marquages fériés / vacances, sous la grille */
+.calendar-marks-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.2rem;
+  margin-top: 0.6rem;
+}
+
+.calendar-mark-sample {
+  font-weight: 600;
+  color: #111827;
+}
+
 /* La couleur et le motif disent le type de jour ; le liseré pointillé dit
    qu'aucun hint n'a réclamé ce jour-là. */
 .calendar-day-unclassified {
