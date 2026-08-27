@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import type { CalendarHintsResult, Period } from '../../../src/calendar-hints'
-import { frLabel } from './ResultsView'
+import type { CalendarHintsResult } from '../../../src/calendar-hints'
+import { dayTypeBackground, type DayType, type DayTypes } from '../day-types'
 
 const MONTHS_FR = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
@@ -10,9 +10,9 @@ const DAY_HEADERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 interface DayCell {
   date: string
-  color: string | null // null = jour non classé (hachuré)
-  label: string
-  tripCount: number
+  type: DayType
+  /** Aucun hint (ni la passe finale par jour de semaine) n'a classé ce jour */
+  unclassified: boolean
 }
 
 interface Month {
@@ -22,39 +22,15 @@ interface Month {
   cells: (DayCell | null)[]
 }
 
-export default function CalendarGrid({ result, periods, colors }: {
+export default function CalendarGrid({ result, dayTypes }: {
   result: CalendarHintsResult
-  /** Périodes déjà triées : mêmes indices de couleur que les cartes */
-  periods: Period[]
-  colors: string[]
+  dayTypes: DayTypes
 }) {
   const months = useMemo<Month[]>(() => {
-    const byDate = new Map<string, DayCell>()
-    periods.forEach((p, i) => {
-      const color = colors[i % colors.length]
-      const label = p.labels.map(frLabel).join(' + ')
-      for (const d of p.days) {
-        const info = result.days.find(x => x.date === d)
-        byDate.set(d, { date: d, color, label, tripCount: info?.tripCount ?? 0 })
-      }
-    })
-    for (const g of result.unclassified) {
-      for (const d of g.days) {
-        byDate.set(d, { date: d, color: null, label: 'non classé', tripCount: g.tripCount })
-      }
-    }
-    // Les jours dans la plage mais absents des deux listes (ne devrait pas
-    // arriver) restent visibles en gris neutre
-    for (const d of result.days) {
-      if (!byDate.has(d.date)) {
-        byDate.set(d.date, { date: d.date, color: '#9ca3af', label: '?', tripCount: d.tripCount })
-      }
-    }
-
     const months: Month[] = []
     let current: Month | null = null
     for (const day of result.days) {
-      const [y, m, dayNum] = [day.date.slice(0, 4), Number(day.date.slice(5, 7)), Number(day.date.slice(8, 10))]
+      const [y, m] = [day.date.slice(0, 4), Number(day.date.slice(5, 7))]
       const key = `${y}-${m}`
       if (!current || current.key !== key) {
         current = { key, title: `${MONTHS_FR[m - 1]} ${y}`, cells: [] }
@@ -64,38 +40,67 @@ export default function CalendarGrid({ result, periods, colors }: {
         const mondayIndex = (weekday + 6) % 7
         for (let i = 0; i < mondayIndex; i++) current.cells.push(null)
       }
-      void dayNum
-      current.cells.push(byDate.get(day.date)!)
+      current.cells.push({
+        date: day.date,
+        type: dayTypes.bySignature.get(day.signature)!,
+        unclassified: dayTypes.unclassifiedDates.has(day.date),
+      })
     }
     return months
-  }, [result, periods, colors])
+  }, [result, dayTypes])
 
   return (
-    <div className="calendar-grid">
-      {months.map(month => (
-        <div key={month.key} className="calendar-month">
-          <div className="calendar-month-title">{month.title}</div>
-          <div className="calendar-days">
-            {DAY_HEADERS.map((h, i) => (
-              <div key={i} className="calendar-day-header">{h}</div>
-            ))}
-            {month.cells.map((cell, i) =>
-              cell ? (
-                <div
-                  key={cell.date}
-                  className={`calendar-day ${cell.color === null ? 'calendar-day-unclassified' : ''}`}
-                  style={cell.color ? { backgroundColor: cell.color } : undefined}
-                  title={`${cell.date} — ${cell.label} — ${cell.tripCount} courses`}
-                >
-                  {Number(cell.date.slice(8, 10))}
-                </div>
-              ) : (
-                <div key={`empty-${i}`} className="calendar-day calendar-day-empty" />
-              ),
-            )}
+    <>
+      <div className="calendar-grid">
+        {months.map(month => (
+          <div key={month.key} className="calendar-month">
+            <div className="calendar-month-title">{month.title}</div>
+            <div className="calendar-days">
+              {DAY_HEADERS.map((h, i) => (
+                <div key={i} className="calendar-day-header">{h}</div>
+              ))}
+              {month.cells.map((cell, i) =>
+                cell ? (
+                  <div
+                    key={cell.date}
+                    className={`calendar-day ${cell.unclassified ? 'calendar-day-unclassified' : ''}`}
+                    style={{ background: dayTypeBackground(cell.type.style) }}
+                    title={
+                      `${cell.date} — ${cell.type.label} — ${cell.type.tripCount} courses` +
+                      `${cell.unclassified && cell.type.label !== 'non classé' ? ' (jour non classé)' : ''}` +
+                      ` — signature ${cell.type.signature}`
+                    }
+                  >
+                    {Number(cell.date.slice(8, 10))}
+                  </div>
+                ) : (
+                  <div key={`empty-${i}`} className="calendar-day calendar-day-empty" />
+                ),
+              )}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      <div className="day-type-legend">
+        {dayTypes.list.map(type => (
+          <div key={type.signature} className="day-type-item">
+            <span
+              className={`day-type-swatch ${type.unclassifiedCount > 0 ? 'day-type-swatch-unclassified' : ''}`}
+              style={{ background: dayTypeBackground(type.style) }}
+            />
+            <div className="day-type-text">
+              <span className="day-type-label" title={`signature ${type.signature}`}>{type.label}</span>
+              <span className="muted small">
+                {type.dayCount} j · {type.tripCount.toLocaleString('fr-FR')} courses
+                {type.unclassifiedCount > 0 && type.unclassifiedCount < type.dayCount
+                  ? ` · dont ${type.unclassifiedCount} non classé${type.unclassifiedCount > 1 ? 's' : ''}`
+                  : ''}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }

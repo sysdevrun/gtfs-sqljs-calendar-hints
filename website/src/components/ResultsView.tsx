@@ -1,33 +1,10 @@
 import { useMemo } from 'react'
 import type { CalendarHintsResult, HintResult, Period } from '../../../src/calendar-hints'
+import { buildDayTypes, dayTypeBackground, frLabel, type DayTypeStyle } from '../day-types'
 import CalendarGrid from './CalendarGrid'
 
 const WEEKDAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
 const weekdayOf = (iso: string) => new Date(iso + 'T00:00:00Z').getUTCDay()
-
-// Palette stable pour colorer les périodes (calendrier + cartes)
-export const PERIOD_COLORS = [
-  '#2563eb', '#16a34a', '#ea580c', '#9333ea', '#0891b2', '#ca8a04',
-  '#dc2626', '#4f46e5', '#059669', '#d97706', '#db2777', '#65a30d',
-]
-
-// La librairie produit des libellés en anglais ; on les traduit à l'affichage.
-// « Remaining days — lundis » est réduit au seul nom du jour.
-const LABEL_FR: [string, string][] = [
-  ['Remaining days — ', ''],
-  ['Remaining days', 'Jours restants'],
-  ['Mondays', 'lundis'],
-  ['Tuesdays', 'mardis'],
-  ['Wednesdays', 'mercredis'],
-  ['Thursdays', 'jeudis'],
-  ['Fridays', 'vendredis'],
-  ['Saturdays', 'samedis'],
-  ['Sundays', 'dimanches'],
-]
-
-export function frLabel(label: string): string {
-  return LABEL_FR.reduce((s, [en, fr]) => s.replaceAll(en, fr), label)
-}
 
 function formatDays(days: string[]): string {
   if (days.length <= 10) return days.join(', ')
@@ -67,10 +44,13 @@ function HintResultView({ r }: { r: HintResult }) {
   )
 }
 
-function PeriodCard({ period, color }: { period: Period; color: string }) {
+function PeriodCard({ period, style }: { period: Period; style: DayTypeStyle }) {
   return (
-    <div className="period-card" style={{ borderLeftColor: color }}>
-      <div className="period-labels">{period.labels.map(frLabel).join(' + ')}</div>
+    <div className="period-card" style={{ borderLeftColor: style.color }}>
+      <div className="period-labels">
+        <span className="day-type-swatch" style={{ background: dayTypeBackground(style) }} />
+        {period.labels.map(frLabel).join(' + ')}
+      </div>
       <div className="muted">
         {period.days.length} jours ({period.days[0]} → {period.days[period.days.length - 1]}) —{' '}
         {period.tripCount.toLocaleString('fr-FR')} courses — services {servicesLabel(period.serviceIds)}
@@ -80,10 +60,6 @@ function PeriodCard({ period, color }: { period: Period; color: string }) {
 }
 
 export default function ResultsView({ result }: { result: CalendarHintsResult }) {
-  const distinctSignatures = useMemo(
-    () => new Set(result.days.map(d => d.signature)).size,
-    [result],
-  )
   // Périodes dans l'ordre des hints (puis des jours restants), pas par taille
   const orderedPeriods = useMemo(() => {
     const order = new Map<string, number>()
@@ -97,6 +73,9 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
       (a, b) => (order.get(a.signature) ?? Infinity) - (order.get(b.signature) ?? Infinity),
     )
   }, [result])
+  // Un type de jour par signature : les périodes d'abord (mêmes couleurs que
+  // les cartes ci-dessous), puis les signatures restées non classées.
+  const dayTypes = useMemo(() => buildDayTypes(result, orderedPeriods), [result, orderedPeriods])
   const unclassifiedCount = result.unclassified.reduce((n, g) => n + g.days.length, 0)
 
   return (
@@ -105,20 +84,24 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
         <h2>Synthèse des périodes</h2>
         <p className="muted">
           Plage analysée : <code>{result.firstDay}</code> → <code>{result.lastDay}</code>{' '}
-          ({result.days.length} jours, {distinctSignatures} signatures distinctes,{' '}
+          ({result.days.length} jours, {dayTypes.list.length} signatures distinctes,{' '}
           {unclassifiedCount} jour{unclassifiedCount > 1 ? 's' : ''} non classé{unclassifiedCount > 1 ? 's' : ''})
         </p>
         <div className="period-list">
-          {orderedPeriods.map((p, i) => (
-            <PeriodCard key={p.signature} period={p} color={PERIOD_COLORS[i % PERIOD_COLORS.length]} />
+          {orderedPeriods.map(p => (
+            <PeriodCard key={p.signature} period={p} style={dayTypes.bySignature.get(p.signature)!.style} />
           ))}
         </div>
       </section>
 
       <section className="card">
         <h2>Calendrier</h2>
-        <p className="muted">Chaque jour est coloré selon sa période ; les jours non classés sont hachurés.</p>
-        <CalendarGrid result={result} periods={orderedPeriods} colors={PERIOD_COLORS} />
+        <p className="muted">
+          Chaque jour est peint selon son <strong>type de jour</strong> : deux jours qui font
+          tourner exactement les mêmes courses partagent la même couleur et le même motif —
+          y compris les jours qu'aucun hint n'a classés, entourés de pointillés.
+        </p>
+        <CalendarGrid result={result} dayTypes={dayTypes} />
       </section>
 
       <section className="card">
@@ -135,6 +118,10 @@ export default function ResultsView({ result }: { result: CalendarHintsResult })
             const weekdays = [...new Set(g.days.map(d => WEEKDAYS_FR[weekdayOf(d)]))].join(', ')
             return (
               <div key={g.signature} className="hint-mismatch">
+                <span
+                  className="day-type-swatch day-type-swatch-unclassified"
+                  style={{ background: dayTypeBackground(dayTypes.bySignature.get(g.signature)!.style) }}
+                />{' '}
                 <code>[{g.signature}]</code> {g.days.length} j. ({weekdays}),{' '}
                 {g.tripCount.toLocaleString('fr-FR')} courses, services {servicesLabel(g.serviceIds)}
                 <div className="muted small">{formatDays(g.days)}</div>

@@ -417,6 +417,9 @@ code {
 
 .period-labels {
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 /* --- Calendrier --------------------------------------------------------- */
@@ -454,19 +457,63 @@ code {
   color: #fff;
   font-weight: 600;
   cursor: default;
+  /* le numéro reste lisible sur les motifs hachurés */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .calendar-day-empty {
   background: transparent;
 }
 
+/* La couleur et le motif disent le type de jour ; le liseré pointillé dit
+   qu'aucun hint n'a réclamé ce jour-là. */
 .calendar-day-unclassified {
-  color: #111827;
-  background: repeating-linear-gradient(
-    45deg,
-    #e5e7eb,
-    #e5e7eb 3px,
-    #fca5a5 3px,
-    #fca5a5 6px
-  );
+  outline: 2px dashed rgba(17, 24, 39, 0.65);
+  outline-offset: -3px;
+}
+
+/* --- Légende des types de jour ------------------------------------------ */
+.day-type-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.35rem 1.2rem;
+  margin-top: 1rem;
+}
+
+.day-type-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.day-type-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.day-type-label {
+  font-weight: 600;
+}
+
+.day-type-swatch {
+  flex: none;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(17, 24, 39, 0.15);
+  vertical-align: -3px;
+}
+
+.day-type-item .day-type-swatch {
+  margin-top: 2px;
+}
+
+.day-type-swatch-unclassified {
+  border-color: transparent;
+  outline: 2px dashed rgba(17, 24, 39, 0.65);
+  outline-offset: -2px;
 }
