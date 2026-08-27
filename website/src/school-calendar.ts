@@ -2,11 +2,17 @@
 // data.education.gouv.fr :
 // https://data.education.gouv.fr/explore/assets/fr-en-calendrier-scolaire/
 //
-// L'export JSON complet (~550 ko, 13 zones, 2017-2018 → 2026-2027) est servi
-// avec `Access-Control-Allow-Origin: *` : téléchargeable directement depuis le
+// L'export JSON complet (13 zones, 2009-2010 → 2028-2029) est servi avec
+// `Access-Control-Allow-Origin: *` : téléchargeable directement depuis le
 // navigateur, sans passer par le proxy. Ne poser aucun en-tête sur la requête —
 // `Content-Type` n'est pas listé dans `Access-Control-Allow-Headers` et un
 // simple `Content-Type: application/json` fait échouer le preflight.
+//
+// Il est tentant de le restreindre aux années récentes (`where=end_date >=
+// date'…'`, accepté par l'endpoint), mais l'API gzippe : 25 ko sur le réseau
+// pour l'export entier contre 6 ko pour deux années scolaires. Les 19 ko
+// économisés ne valent pas de faire disparaître silencieusement les hints des
+// feeds archivés que la démo sait analyser.
 import fallbackExtract from '../../data/school-calendar.json'
 
 export const DATASET_URL =

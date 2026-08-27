@@ -260,8 +260,8 @@ export default function App() {
               Calendrier officiel{' '}
               <a href={DATASET_URL} target="_blank" rel="noreferrer">fr-en-calendrier-scolaire</a>{' '}
               (data.education.gouv.fr) : les trois zones de métropole, la Corse et l'outre-mer,
-              avec toutes leurs académies. Environ 550 ko téléchargés depuis l'API — elle
-              autorise le CORS, aucun proxy n'est nécessaire.
+              avec toutes leurs académies. Environ 25 ko sur le réseau (550 ko une fois
+              décompressés) — l'API autorise le CORS, aucun proxy n'est nécessaire.
             </p>
             <button
               className="hint-config-add"

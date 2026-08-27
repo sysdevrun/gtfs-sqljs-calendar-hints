@@ -249,7 +249,7 @@ construire les listes de dates. Sources recommandées pour la France :
 - **Vacances scolaires** : API `data.education.gouv.fr` / dataset
   `fr-en-calendrier-scolaire`.
   [Description du jeu de données](https://data.education.gouv.fr/explore/assets/fr-en-calendrier-scolaire/)
-  · export complet (~550 ko, 2406 enregistrements) :
+  · export complet (2406 enregistrements, 550 ko servis gzippés en ~25 ko) :
   <https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/exports/json/>
 
   Le champ `zones` couvre 13 valeurs : `Zone A`, `Zone B`, `Zone C`,
