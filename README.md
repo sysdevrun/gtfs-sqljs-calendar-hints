@@ -169,6 +169,41 @@ result.periods[0].hints[0]?.color   // '#e33' — même objet, typé MyHint
 Conséquence du passage par référence : ne mutez pas un hint après l'appel si
 vous voulez un résultat stable.
 
+### Groupage sans hints : `detectDayPatterns`
+
+Le groupage par signature n'a pas besoin de hints : `detectDayPatterns(days)`
+prend le tableau `days` d'un `CalendarAnalyzer` (ou d'un résultat) et décrit
+chaque groupe de signature par le pattern calendaire **exact** qu'il forme —
+purement déductif, sans seuil, comme le reste de la librairie :
+
+```typescript
+import { createCalendarAnalyzer, detectDayPatterns } from 'gtfs-sqljs-calendar-hints'
+
+const analyzer = await createCalendarAnalyzer(gtfs, { signatureMode: 'trip-content' })
+for (const p of detectDayPatterns(analyzer.days)) {
+  console.log(p.label) // 'Sundays', 'Mondays to Fridays from 2025-09-01 to 2026-07-03 except 44 days', …
+}
+```
+
+Chaque `DayPattern` porte le groupe (`days`, `signature`, `tripCount`,
+`serviceIds`), ses jours de semaine (`weekdays`, lundi en premier), ses bornes
+et son type :
+
+- `full-range` : tous les jours de son ensemble de jours de semaine sur toute
+  la plage analysée (« tous les dimanches », « tous les jours ») ;
+- `span` : tous les jours de son ensemble sur une sous-période stricte
+  (service saisonnier) ;
+- `span-with-exceptions` : idem avec des trous — `missingDays` les liste,
+  `missingRanges` regroupe les trous consécutifs (une semaine de vacances
+  sautée par un groupe lun-ven = une seule plage).
+
+Les groupes reviennent du plus gros au plus petit ; un groupe d'un seul jour
+a sa date pour `label`. Le mode `trip-content` est recommandé ici : il
+fusionne les horaires identiques publiés sous des `trip_id` différents avant
+la recherche de patterns. Les patterns restent structurels — ils disent
+*quand* chaque niveau de service circule, jamais *pourquoi* : nommer un
+groupe « vacances scolaires » ou « jours fériés » reste le rôle des hints.
+
 ## Edge cases à surveiller (tous observés sur des feeds réels)
 
 **Structure des fichiers**

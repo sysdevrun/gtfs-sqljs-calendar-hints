@@ -564,6 +564,138 @@ export async function findCalendarPeriods<H extends Hint = Hint>(
   return (await createCalendarAnalyzer(gtfs, options)).analyze(hints)
 }
 
+// ---------------------------------------------------------------------------
+// Hint-free pattern detection
+// ---------------------------------------------------------------------------
+
+export type DayPatternKind = 'full-range' | 'span' | 'span-with-exceptions'
+
+export interface DayRange {
+  firstDay: string
+  lastDay: string
+}
+
+/**
+ * One signature group of days, described by the exact calendar pattern it
+ * forms:
+ *
+ * - 'full-range': the group is every day of its weekday set over the whole
+ *   analysed range (e.g. "Sundays", "Every day");
+ * - 'span': every day of its weekday set within [firstDay, lastDay], a strict
+ *   sub-range of the analysed range (e.g. a seasonal weekday service);
+ * - 'span-with-exceptions': like 'span' but with gaps — `missingDays` lists
+ *   them, `missingRanges` collapses consecutive ones (consecutive within the
+ *   weekday set, so a skipped week of a Mon–Fri group is one range).
+ */
+export interface DayPattern {
+  signature: string
+  days: string[]
+  tripCount: number
+  serviceIds: string[]
+  /** Distinct weekdays present (0=Sunday … 6=Saturday), Monday first */
+  weekdays: number[]
+  firstDay: string
+  lastDay: string
+  kind: DayPatternKind
+  /** Days of the weekday set within [firstDay, lastDay] absent from the group */
+  missingDays: string[]
+  /** missingDays collapsed into runs of consecutive weekday-set days */
+  missingRanges: DayRange[]
+  /** Human-readable summary; a single-day group is labeled by its date */
+  label: string
+}
+
+// 'Mondays to Fridays', 'Saturdays and Sundays', 'Mondays, Wednesdays'…
+// consecutive weekdays (Monday first, no wrap-around) collapse into a run.
+function weekdaysLabel(weekdays: number[]): string {
+  if (weekdays.length === 7) return 'Every day'
+  const positions = weekdays.map(w => MONDAY_TO_SUNDAY.indexOf(w)).sort((a, b) => a - b)
+  const runs: string[] = []
+  for (let i = 0; i < positions.length; i++) {
+    const start = i
+    while (i + 1 < positions.length && positions[i + 1] === positions[i] + 1) i++
+    const first = WEEKDAY_NAMES[MONDAY_TO_SUNDAY[positions[start]]]
+    runs.push(i === start ? first : `${first} to ${WEEKDAY_NAMES[MONDAY_TO_SUNDAY[positions[i]]]}`)
+  }
+  return runs.join(', ')
+}
+
+/**
+ * Group every analysed day by signature and describe each group by the exact
+ * calendar pattern it forms — no hints, no thresholds, purely deductive.
+ * Groups come back largest first. Pass the `days` of a CalendarAnalyzer or
+ * CalendarHintsResult (contiguous, sorted — as produced there); combine with
+ * `signatureMode: 'trip-content'` to merge identical schedules published
+ * under different trip_ids before looking for patterns.
+ *
+ * The patterns are structural: they say *when* each distinct service level
+ * runs, never *why* (naming a group "school vacations" or "public holidays"
+ * still requires hints).
+ */
+export function detectDayPatterns(days: DayInfo[]): DayPattern[] {
+  const allDays = days.map(d => d.date)
+
+  const bySignature = new Map<string, DayInfo[]>()
+  for (const d of days) {
+    if (!bySignature.has(d.signature)) bySignature.set(d.signature, [])
+    bySignature.get(d.signature)!.push(d)
+  }
+
+  const patterns: DayPattern[] = [...bySignature.values()].map(group => {
+    const groupDays = group.map(d => d.date)
+    const daySet = new Set(groupDays)
+    const weekdaySet = new Set(groupDays.map(weekdayOf))
+    const weekdays = MONDAY_TO_SUNDAY.filter(w => weekdaySet.has(w))
+    const firstDay = groupDays[0]
+    const lastDay = groupDays[groupDays.length - 1]
+
+    // The group is always a subset of "all weekday-set days" (over the full
+    // range or its own span), so set equality reduces to "nothing missing"
+    const expectedFull = allDays.filter(d => weekdaySet.has(weekdayOf(d)))
+    const expectedSpan = expectedFull.filter(d => d >= firstDay && d <= lastDay)
+    const missingDays = expectedSpan.filter(d => !daySet.has(d))
+    const kind: DayPatternKind =
+      expectedFull.length === groupDays.length ? 'full-range'
+      : missingDays.length === 0 ? 'span'
+      : 'span-with-exceptions'
+
+    const missingSet = new Set(missingDays)
+    const missingRanges: DayRange[] = []
+    for (let i = 0; i < expectedSpan.length; i++) {
+      if (!missingSet.has(expectedSpan[i])) continue
+      const start = expectedSpan[i]
+      while (i + 1 < expectedSpan.length && missingSet.has(expectedSpan[i + 1])) i++
+      missingRanges.push({ firstDay: start, lastDay: expectedSpan[i] })
+    }
+
+    let label: string
+    if (groupDays.length === 1) {
+      label = firstDay
+    } else if (kind === 'full-range') {
+      label = weekdaysLabel(weekdays)
+    } else {
+      label = `${weekdaysLabel(weekdays)} from ${firstDay} to ${lastDay}`
+      if (missingDays.length > 0) label += ` except ${missingDays.length} day${missingDays.length === 1 ? '' : 's'}`
+    }
+
+    return {
+      signature: group[0].signature,
+      days: groupDays,
+      tripCount: group[0].tripCount,
+      serviceIds: group[0].serviceIds,
+      weekdays,
+      firstDay,
+      lastDay,
+      kind,
+      missingDays,
+      missingRanges,
+      label,
+    }
+  })
+
+  return patterns.sort((a, b) => b.days.length - a.days.length || a.firstDay.localeCompare(b.firstDay))
+}
+
 function analyzeWithFeed<H extends Hint>(feed: FeedCalendar, days: DayInfo[], hints: H[]): CalendarHintsResult<H> {
   const remainingDays = new Set(feed.allDays)
   const hintResults = hints.map(h => applyHint(h, remainingDays, feed))

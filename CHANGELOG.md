@@ -2,6 +2,17 @@
 
 ## Upcoming release
 
+- New `detectDayPatterns(days)`: hint-free day grouping. Takes the `days`
+  array of a `CalendarAnalyzer` (or result), groups them by signature and
+  describes each group by the exact calendar pattern it forms — every day of
+  its weekday set over the full range (`full-range`, e.g. "Sundays"), over a
+  strict sub-range (`span`), or with gaps (`span-with-exceptions`, missing
+  days listed and collapsed into ranges). Purely deductive, no thresholds;
+  groups come back largest first with a human-readable `label`. Combine with
+  `signatureMode: 'trip-content'` to merge identical schedules published
+  under different trip_ids first. Patterns are structural (when each service
+  level runs); naming a group "school vacations" still requires hints.
+
 - Demo: the calendar grid now underlines school-vacation days (Sundays
   excluded) and marks public holidays with an asterisk next to the day
   number; both are also spelled out in each day's tooltip.
