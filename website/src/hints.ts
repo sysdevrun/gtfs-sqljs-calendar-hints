@@ -1,6 +1,6 @@
-// Génération des hints côté navigateur : jours fériés français calculés
-// localement (computus), vacances scolaires issues du calendrier officiel
-// chargé par `school-calendar.ts`.
+// Génération des hints côté navigateur : jours fériés français via
+// date-holidays, vacances scolaires issues du calendrier officiel chargé par
+// `school-calendar.ts`.
 import type { Hint, Policy } from '../../src/calendar-hints'
 import type { HolidayZone } from './presets'
 import type { SchoolCalendarRecord } from './school-calendar'
@@ -20,54 +20,28 @@ export function eachDay(firstIso: string, lastIso: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Jours fériés français (type « public » uniquement)
+// Jours fériés français (type « public » uniquement), via date-holidays.
+// Les dates sont lues sur la chaîne `date` (« AAAA-MM-JJ HH:MM:SS ») — jamais
+// via un objet Date local, pour éviter tout glissement de jour selon le
+// fuseau du navigateur. Import dynamique : date-holidays embarque les données
+// de tous les pays (~1,4 Mo minifié), le chunk n'est téléchargé qu'à la
+// première analyse au lieu d'alourdir le chargement de la page.
 // ---------------------------------------------------------------------------
-const iso = (y: number, m: number, d: number) =>
-  `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-
-/** Dimanche de Pâques (algorithme grégorien anonyme). */
-function easterSunday(year: number): string {
-  const a = year % 19
-  const b = Math.floor(year / 100)
-  const c = year % 100
-  const d = Math.floor(b / 4)
-  const e = b % 4
-  const f = Math.floor((b + 8) / 25)
-  const g = Math.floor((b - f + 1) / 3)
-  const h = (19 * a + b - d - g + 15) % 30
-  const i = Math.floor(c / 4)
-  const k = c % 4
-  const l = (32 + 2 * e + 2 * i - h - k) % 7
-  const m = Math.floor((a + 11 * h + 22 * l) / 451)
-  const month = Math.floor((h + l - 7 * m + 114) / 31)
-  const day = ((h + l - 7 * m + 114) % 31) + 1
-  return iso(year, month, day)
-}
-
 export interface PublicHoliday {
   date: string
   name: string
 }
 
-export function publicHolidays(zone: HolidayZone, firstDay: string, lastDay: string): PublicHoliday[] {
+let holidaysModule: Promise<typeof import('date-holidays')> | null = null
+const loadHolidays = () => (holidaysModule ??= import('date-holidays'))
+
+export async function publicHolidays(zone: HolidayZone, firstDay: string, lastDay: string): Promise<PublicHoliday[]> {
+  const Holidays = (await loadHolidays()).default
+  const hd = zone === 'reunion' ? new Holidays('FR', 'RE') : new Holidays('FR')
   const holidays: PublicHoliday[] = []
   for (let y = Number(firstDay.slice(0, 4)); y <= Number(lastDay.slice(0, 4)); y++) {
-    const easter = easterSunday(y)
-    holidays.push(
-      { date: iso(y, 1, 1), name: 'Jour de l’an' },
-      { date: addDays(easter, 1), name: 'Lundi de Pâques' },
-      { date: iso(y, 5, 1), name: 'Fête du travail' },
-      { date: iso(y, 5, 8), name: 'Victoire 1945' },
-      { date: addDays(easter, 39), name: 'Ascension' },
-      { date: addDays(easter, 50), name: 'Lundi de Pentecôte' },
-      { date: iso(y, 7, 14), name: 'Fête nationale' },
-      { date: iso(y, 8, 15), name: 'Assomption' },
-      { date: iso(y, 11, 1), name: 'Toussaint' },
-      { date: iso(y, 11, 11), name: 'Armistice 1918' },
-      { date: iso(y, 12, 25), name: 'Noël' },
-    )
-    if (zone === 'reunion') {
-      holidays.push({ date: iso(y, 12, 20), name: 'Abolition de l’esclavage' })
+    for (const h of hd.getHolidays(y)) {
+      if (h.type === 'public') holidays.push({ date: h.date.slice(0, 10), name: h.name })
     }
   }
   return holidays.filter(h => h.date >= firstDay && h.date <= lastDay).sort((a, b) => a.date.localeCompare(b.date))
@@ -210,15 +184,15 @@ export interface GeneratedHints {
   hints: Hint[]
 }
 
-export function generateHints(
+export async function generateHints(
   zone: HolidayZone,
   schoolRecords: SchoolCalendarRecord[],
   firstDay: string,
   lastDay: string,
   configs: HintConfig[] = DEFAULT_HINT_CONFIGS,
   vacationOptions: VacationOptions = {},
-): GeneratedHints {
-  const holidays = publicHolidays(zone, firstDay, lastDay)
+): Promise<GeneratedHints> {
+  const holidays = await publicHolidays(zone, firstDay, lastDay)
   const vacationRanges = schoolVacationRanges(schoolRecords, firstDay, lastDay, vacationOptions)
   const daysOf = (c: HintConfig): string[] => {
     if (c.source === 'holidays') return holidays.map(h => h.date)

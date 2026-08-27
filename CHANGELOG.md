@@ -17,6 +17,11 @@
 - Demo & examples: new option (`includeWedSatStart`, default `true`; a
   selector in the web UI) to instead treat a Wednesday/Saturday departure day
   as a school day, with vacation starting the next day.
+- Demo: French public holidays now come from the `date-holidays` package
+  (already used by the examples) instead of a hand-rolled computus list. The
+  module is dynamically imported so its all-countries dataset (~230 kB
+  gzipped) is fetched on first analysis rather than on page load. The npm
+  package itself remains dependency-free.
 
 ## 0.3.0
 

@@ -106,7 +106,7 @@ export default function App() {
       // …qui permet de générer les hints (fériés + vacances scolaires)…
       const schoolCalendar = await loadSchoolCalendar()
       setCalendar(schoolCalendar)
-      const generated = generateHints(
+      const generated = await generateHints(
         s.zone,
         recordsForLocation(schoolCalendar, s.academy),
         probe.firstDay,
