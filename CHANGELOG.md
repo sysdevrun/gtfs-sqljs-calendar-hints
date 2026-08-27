@@ -2,6 +2,27 @@
 
 ## Upcoming release
 
+- Demo & examples: fix the school-vacation date rules derived from the
+  `fr-en-calendrier-scolaire` dataset. Its timestamps are Paris-midnight
+  instants serialized in UTC (`2026-10-09T22:00:00+00:00`); they are now
+  resolved to the official Paris calendar date (never the local DOM timezone,
+  which would shift the day in the Antilles) instead of being truncated as
+  UTC. The published start date is the departure day (classes end that
+  evening): vacation now starts the next day — except when departure falls on
+  a Wednesday or Saturday, which counts as vacation (no class that day for
+  most students). The published end date is the return-to-school morning:
+  vacation ends the day before, as previously. This removes one wrongly
+  counted school day at the start of weekday-departure vacations (e.g. La
+  Réunion, mardi 16 mars 2027) and of the Pont de l'Ascension.
+- Demo & examples: new option (`includeWedSatStart`, default `true`; a
+  selector in the web UI) to instead treat a Wednesday/Saturday departure day
+  as a school day, with vacation starting the next day.
+- Demo: French public holidays now come from the `date-holidays` package
+  (already used by the examples) instead of a hand-rolled computus list. The
+  module is dynamically imported so its all-countries dataset (~230 kB
+  gzipped) is fetched on first analysis rather than on page load. The npm
+  package itself remains dependency-free.
+
 ## 0.3.0
 
 - **Breaking: `GtfsCalendarSource` now targets gtfs-sqljs ≥ 0.9.0.**
