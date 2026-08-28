@@ -148,7 +148,7 @@ export interface HintConfig {
 
 export const DEFAULT_HINT_CONFIGS: HintConfig[] = [
   { id: 'holidays', source: 'holidays', name: 'Jours fériés', policy: 'match-all', enabled: true, daysText: '' },
-  { id: 'school-vacations', source: 'school-vacations', name: 'Vacances scolaires (lun-ven)', policy: 'match-all', enabled: true, daysText: '' },
+  { id: 'school-vacations', source: 'school-vacations', name: 'Vacances scolaires (lun-ven)', policy: 'per-day-of-week', enabled: true, daysText: '' },
 ]
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
