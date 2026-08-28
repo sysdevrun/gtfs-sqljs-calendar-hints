@@ -2,6 +2,12 @@
 
 ## Upcoming release
 
+- Demo: the built-in school-vacation hint now covers Monday to Saturday
+  instead of Monday to Friday, and is renamed « Vacances scolaires
+  (lun-sam) ». Saturdays inside a vacation period therefore get their own
+  per-day-of-week group, matching what the calendar grid already
+  highlighted (every vacation day except Sundays).
+
 - Demo: the calendar grid now underlines school-vacation days (Sundays
   excluded) and marks public holidays with an asterisk next to the day
   number; both are also spelled out in each day's tooltip.

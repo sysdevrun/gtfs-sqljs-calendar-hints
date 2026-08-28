@@ -122,10 +122,10 @@ export function schoolVacationRanges(
     .sort((a, b) => a.first.localeCompare(b.first))
 }
 
-/** Jours de vacances scolaires, du lundi au vendredi uniquement. */
+/** Jours de vacances scolaires, du lundi au samedi (dimanches exclus). */
 export function vacationDaysOf(ranges: VacationRange[]): string[] {
-  const isMonToFri = (d: string) => weekdayOf(d) >= 1 && weekdayOf(d) <= 5
-  return [...new Set(ranges.flatMap(v => eachDay(v.first, v.last)))].filter(isMonToFri).sort()
+  const isMonToSat = (d: string) => weekdayOf(d) >= 1 && weekdayOf(d) <= 6
+  return [...new Set(ranges.flatMap(v => eachDay(v.first, v.last)))].filter(isMonToSat).sort()
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ export interface HintConfig {
 
 export const DEFAULT_HINT_CONFIGS: HintConfig[] = [
   { id: 'holidays', source: 'holidays', name: 'Jours fériés', policy: 'match-all', enabled: true, daysText: '' },
-  { id: 'school-vacations', source: 'school-vacations', name: 'Vacances scolaires (lun-ven)', policy: 'per-day-of-week', enabled: true, daysText: '' },
+  { id: 'school-vacations', source: 'school-vacations', name: 'Vacances scolaires (lun-sam)', policy: 'per-day-of-week', enabled: true, daysText: '' },
 ]
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/

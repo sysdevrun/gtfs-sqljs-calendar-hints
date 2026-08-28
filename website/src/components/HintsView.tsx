@@ -17,7 +17,7 @@ export default function HintsView({ generated }: { generated: GeneratedHints }) 
               <li key={h.date}><code>{h.date}</code> — {h.name}</li>
             ))}
           </ul>
-          <h3>Vacances scolaires (jours lundi-vendredi retenus)</h3>
+          <h3>Vacances scolaires (jours lundi-samedi retenus)</h3>
           <ul>
             {generated.vacationRanges.map(v => (
               <li key={v.label + v.first}>{v.label} : <code>{v.first}</code> → <code>{v.last}</code></li>
