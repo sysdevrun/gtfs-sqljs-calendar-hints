@@ -104,10 +104,13 @@ interface GeoJsonFeature {
   geometry?: { type?: unknown; coordinates?: unknown }
 }
 
-function toContour(feature: GeoJsonFeature): AcademyContour | null {
-  const name = feature.properties?.name
-  const geometry = feature.geometry
-  if (typeof name !== 'string' || !geometry) return null
+/** Contour prêt pour `academyContains` (polygones + bbox) à partir d'une
+ *  géométrie GeoJSON. Sert aussi aux territoires de fériés (holiday-zones.ts). */
+export function contourOf(
+  name: string,
+  geometry: GeoJsonFeature['geometry'],
+): AcademyContour | null {
+  if (!geometry) return null
   const polygons =
     geometry.type === 'Polygon'
       ? [geometry.coordinates as PolygonRings]
@@ -124,7 +127,13 @@ function toContour(feature: GeoJsonFeature): AcademyContour | null {
       if (lat > bbox.maxLat) bbox.maxLat = lat
     }
   }
-  return { name: CALENDAR_NAMES[name] ?? name, polygons, bbox }
+  return { name, polygons, bbox }
+}
+
+function toContour(feature: GeoJsonFeature): AcademyContour | null {
+  const name = feature.properties?.name
+  if (typeof name !== 'string') return null
+  return contourOf(CALENDAR_NAMES[name] ?? name, feature.geometry)
 }
 
 function toContours(raw: unknown, source: AcademyContours['source'], error?: string): AcademyContours {

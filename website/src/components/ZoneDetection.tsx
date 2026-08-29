@@ -13,8 +13,6 @@ interface Props {
   state: ZoneDetectionState
   /** `manual` : l'utilisateur a repris la main sur les sélecteurs. */
   academySource: 'auto' | 'manual'
-  /** Un libellé de fériés a été ajusté en même temps que la zone (DOM). */
-  holidayZoneLabel?: string
   onUseDetected: (academy: string) => void
 }
 
@@ -24,7 +22,7 @@ const fmt = (n: number) => n.toLocaleString('fr-FR')
 const deAcademy = (name: string) =>
   name === 'Réunion' ? 'de La Réunion' : /^[AEIOUÉÈÊÀÂÎÔ]/.test(name) ? `d'${name}` : `de ${name}`
 
-export default function ZoneDetection({ state, academySource, holidayZoneLabel, onUseDetected }: Props) {
+export default function ZoneDetection({ state, academySource, onUseDetected }: Props) {
   if (state.kind === 'failed') {
     return (
       <div className="zone-detection detection-warn">
@@ -130,7 +128,6 @@ export default function ZoneDetection({ state, academySource, holidayZoneLabel, 
         <span className="badge badge-ok">Zone détectée automatiquement</span>{' '}
         <strong>{d.zone}</strong> — les {fmt(d.pointCount)} positions d'arrêt du feed
         ({fmt(report.totalStops)} arrêts) sont toutes dans {academies} (contours {datasetLink}).
-        {holidayZoneLabel && <> Jours fériés réglés sur « {holidayZoneLabel} ».</>}
       </p>
       {fallbackNote}
       {ignoredNote}
