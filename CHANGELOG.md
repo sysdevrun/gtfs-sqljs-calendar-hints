@@ -3,9 +3,11 @@
 ## Upcoming release
 
 - Demo: period labels now group the per-day-of-week entries of a hint and
-  condense consecutive weekdays into a range, e.g. « Vacances scolaires
-  (lun-sam) : du lundi au samedi + samedis » instead of one « … — lundis »
-  entry per weekday. Applies to the period cards and the calendar legend.
+  condense consecutive weekdays into a range, days first and hint name in
+  parentheses: « Du lundi au samedi (Vacances scolaires) + samedis » instead
+  of one « … — lundis » entry per weekday. Applies to the period cards and
+  the calendar legend. The built-in school-vacation hint drops its
+  « (lun-sam) » suffix, redundant now that the labels spell the days out.
 
 - Demo: new « Sous le capot » section under the results with two collapsible,
   syntax-highlighted (Prism) snippets: the exact `findCalendarPeriods` call of
@@ -15,10 +17,9 @@
   with a copy button.
 
 - Demo: the built-in school-vacation hint now covers Monday to Saturday
-  instead of Monday to Friday, and is renamed « Vacances scolaires
-  (lun-sam) ». Saturdays inside a vacation period therefore get their own
-  per-day-of-week group, matching what the calendar grid already
-  highlighted (every vacation day except Sundays).
+  instead of Monday to Friday. Saturdays inside a vacation period therefore
+  get their own per-day-of-week group, matching what the calendar grid
+  already highlighted (every vacation day except Sundays).
 
 - Demo: the calendar grid now underlines school-vacation days (Sundays
   excluded) and marks public holidays with an asterisk next to the day
