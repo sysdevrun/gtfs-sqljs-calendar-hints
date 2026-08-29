@@ -2,6 +2,13 @@
 
 ## Upcoming release
 
+- Demo: the public-holiday selector now offers every French zone known to
+  date-holidays instead of only mainland France and La Réunion:
+  Alsace-Moselle, Guadeloupe, Martinique, Guyane, Mayotte, Saint-Martin,
+  Saint-Barthélemy, Saint-Pierre-et-Miquelon, Polynésie française,
+  Nouvelle-Calédonie and Wallis-et-Futuna, each with its specific holidays
+  (Vendredi saint, abolition-of-slavery days, territorial holidays…).
+
 - Demo: period labels now group the per-day-of-week entries of a hint and
   condense consecutive weekdays into a range, days first and hint name in
   parentheses: « Du lundi au samedi (Vacances scolaires) + samedis » instead

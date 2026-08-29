@@ -2,7 +2,7 @@
 // date-holidays, vacances scolaires issues du calendrier officiel chargé par
 // `school-calendar.ts`.
 import type { Hint, Policy } from '../../src/calendar-hints'
-import type { HolidayZone } from './presets'
+import { HOLIDAY_ZONES, type HolidayZone } from './presets'
 import type { SchoolCalendarRecord } from './school-calendar'
 
 export const weekdayOf = (iso: string) => new Date(iso + 'T00:00:00Z').getUTCDay()
@@ -37,7 +37,8 @@ const loadHolidays = () => (holidaysModule ??= import('date-holidays'))
 
 export async function publicHolidays(zone: HolidayZone, firstDay: string, lastDay: string): Promise<PublicHoliday[]> {
   const Holidays = (await loadHolidays()).default
-  const hd = zone === 'reunion' ? new Holidays('FR', 'RE') : new Holidays('FR')
+  const { country, state } = HOLIDAY_ZONES.find(z => z.id === zone) ?? { country: 'FR', state: undefined }
+  const hd = state === undefined ? new Holidays(country) : new Holidays(country, state)
   const holidays: PublicHoliday[] = []
   for (let y = Number(firstDay.slice(0, 4)); y <= Number(lastDay.slice(0, 4)); y++) {
     for (const h of hd.getHolidays(y)) {

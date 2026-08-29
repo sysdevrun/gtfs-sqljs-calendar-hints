@@ -11,7 +11,7 @@ import {
 import type { CalendarHintsOptions, CalendarHintsResult, SignatureMode } from '../../src/calendar-hints'
 import type { GtfsWorkerAPI, ProgressInfo, FeedSummary } from './gtfs.worker'
 import { proxyUrl } from './proxy'
-import { PRESETS, type Academy, type HolidayZone, type NetworkPreset } from './presets'
+import { HOLIDAY_ZONES, PRESETS, type Academy, type HolidayZone, type NetworkPreset } from './presets'
 import { generateHints, DEFAULT_HINT_CONFIGS, type GeneratedHints, type HintConfig } from './hints'
 import {
   loadSchoolCalendar,
@@ -238,8 +238,9 @@ export default function App() {
             Jours fériés
             <select value={settings.zone} disabled={busy}
               onChange={e => updateSetting('zone', e.target.value as HolidayZone)}>
-              <option value="metropole">France métropolitaine</option>
-              <option value="reunion">La Réunion (+ 20 décembre)</option>
+              {HOLIDAY_ZONES.map(z => (
+                <option key={z.id} value={z.id}>{z.label}</option>
+              ))}
             </select>
           </label>
           <label>

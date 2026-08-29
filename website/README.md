@@ -10,7 +10,8 @@ directement dans le navigateur :
   `https://gtfs-proxy.sys-dev-run.re/proxy/…` ;
 - des **boutons 1-clic** chargent les réseaux de référence : Car Jaune,
   Kar'Ouest, Citalis, Estival, CarSud, Astuce (Rouen) ;
-- les hints (jours fériés France/Réunion, vacances scolaires des académies
+- les hints (jours fériés de toutes les zones françaises — métropole,
+  Alsace-Moselle, chaque DROM/COM —, vacances scolaires des académies
   Réunion et Normandie via l'API `data.education.gouv.fr`, avec repli sur
   `data/school-calendar.json`) sont générés automatiquement, puis
   `findCalendarPeriods` est exécuté et les périodes affichées (synthèse,

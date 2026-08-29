@@ -1,6 +1,48 @@
 // Réseaux prêts à charger en un clic. Les URLs GTFS proviennent des points
 // d'accès officiels (transport.data.gouv.fr / Pysae / Cityway).
-export type HolidayZone = 'metropole' | 'reunion'
+export type HolidayZone =
+  | 'metropole'
+  | 'alsace-moselle'
+  | 'guadeloupe'
+  | 'martinique'
+  | 'guyane'
+  | 'reunion'
+  | 'mayotte'
+  | 'saint-martin'
+  | 'saint-barthelemy'
+  | 'saint-pierre-et-miquelon'
+  | 'polynesie'
+  | 'nouvelle-caledonie'
+  | 'wallis-et-futuna'
+
+export interface HolidayZoneDef {
+  id: HolidayZone
+  /** Libellé du sélecteur — fériés spécifiques entre parenthèses. */
+  label: string
+  /** Arguments du constructeur date-holidays (pays, puis état éventuel). */
+  country: string
+  state?: string
+}
+
+// Toutes les zones françaises connues de date-holidays. L'Alsace-Moselle y est
+// découpée en trois départements (57/67/68) aux fériés identiques — une seule
+// entrée ici ; Polynésie, Nouvelle-Calédonie, Wallis-et-Futuna et
+// Saint-Pierre-et-Miquelon y sont modélisés comme des pays à part entière.
+export const HOLIDAY_ZONES: HolidayZoneDef[] = [
+  { id: 'metropole', label: 'France métropolitaine', country: 'FR' },
+  { id: 'alsace-moselle', label: 'Alsace-Moselle (+ Vendredi saint, 26 décembre)', country: 'FR', state: '57' },
+  { id: 'guadeloupe', label: 'Guadeloupe (+ Vendredi saint, 27 mai)', country: 'FR', state: 'GP' },
+  { id: 'martinique', label: 'Martinique (+ Vendredi saint, 22 mai)', country: 'FR', state: 'MQ' },
+  { id: 'guyane', label: 'Guyane (+ 10 juin)', country: 'FR', state: 'GF' },
+  { id: 'reunion', label: 'La Réunion (+ 20 décembre)', country: 'FR', state: 'RE' },
+  { id: 'mayotte', label: 'Mayotte (+ 27 avril)', country: 'FR', state: 'YT' },
+  { id: 'saint-martin', label: 'Saint-Martin (+ 27 mai)', country: 'FR', state: 'MF' },
+  { id: 'saint-barthelemy', label: 'Saint-Barthélemy (+ 9 octobre)', country: 'FR', state: 'BL' },
+  { id: 'saint-pierre-et-miquelon', label: 'Saint-Pierre-et-Miquelon', country: 'PM' },
+  { id: 'polynesie', label: 'Polynésie française (+ 5 mars, Matariʻi…)', country: 'PF' },
+  { id: 'nouvelle-caledonie', label: 'Nouvelle-Calédonie (+ 24 septembre)', country: 'NC' },
+  { id: 'wallis-et-futuna', label: 'Wallis-et-Futuna (+ 28 avril, 29 juin, 29 juillet)', country: 'WF' },
+]
 /** `location` du dataset fr-en-calendrier-scolaire : « Réunion », « Normandie »,
  *  « Rennes », « Créteil »… La liste réelle vient du fichier téléchargé. */
 export type Academy = string
