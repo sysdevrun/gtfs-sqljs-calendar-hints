@@ -10,6 +10,13 @@ directement dans le navigateur :
   `https://gtfs-proxy.sys-dev-run.re/proxy/…` ;
 - des **boutons 1-clic** chargent les réseaux de référence : Car Jaune,
   Kar'Ouest, Citalis, Estival, CarSud, Astuce (Rouen) ;
+- la **zone de vacances est détectée automatiquement** à partir des arrêts
+  du feed : académie du premier arrêt localisé (contours officiels
+  `fr-en-contour-academies-2020`, repli sur `data/academies.json`), puis
+  vérification que toutes les positions d'arrêt sont strictement dans les
+  académies de la zone — un bandeau indique clairement si la zone a été
+  trouvée (et pourquoi sinon), les sélecteurs Zone/Académie permettant de
+  reprendre la main ;
 - les hints (jours fériés de toutes les zones françaises — métropole,
   Alsace-Moselle, chaque DROM/COM —, vacances scolaires des académies
   Réunion et Normandie via l'API `data.education.gouv.fr`, avec repli sur

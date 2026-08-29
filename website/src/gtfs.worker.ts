@@ -9,6 +9,14 @@ import {
   type CalendarHintsResult,
   type Hint,
 } from '../../src/calendar-hints'
+import {
+  detectAcademyZone,
+  type AcademyContours,
+  type AcademyDetection,
+  type StopPoint,
+  type StopPointSummary,
+} from './academies'
+import type { ZoneEntry } from './school-calendar'
 
 export interface ProgressInfo {
   phase: string
@@ -27,7 +35,15 @@ export interface GtfsWorkerAPI {
   loadFromUrl(url: string, onProgress: (p: ProgressInfo) => void): Promise<FeedSummary>
   loadFromData(data: ArrayBuffer, onProgress: (p: ProgressInfo) => void): Promise<FeedSummary>
   analyze(hints: Hint[], options: CalendarHintsOptions): Promise<CalendarHintsResult>
+  detectAcademyZone(contours: AcademyContours, zones: ZoneEntry[]): Promise<AcademyZoneReport>
   close(): Promise<void>
+}
+
+/** Détection + comptages des positions, pour l'affichage côté UI. */
+export interface AcademyZoneReport {
+  detection: AcademyDetection
+  totalStops: number
+  ignoredStops: number
 }
 
 // shapes.txt est inutile pour l'analyse de calendrier et souvent énorme
@@ -87,6 +103,45 @@ class GtfsWorker implements GtfsWorkerAPI {
   async analyze(hints: Hint[], options: CalendarHintsOptions): Promise<CalendarHintsResult> {
     if (!this.gtfs) throw new Error('Aucun GTFS chargé')
     return findCalendarPeriods(this.gtfs, hints, options)
+  }
+
+  /** Positions distinctes et plausibles des arrêts du feed. Les coordonnées
+   *  manquantes, hors bornes ou au placeholder (0, 0) sont écartées — un feed
+   *  n'est pas « hors académies » parce qu'un arrêt est mal saisi. Beaucoup
+   *  d'arrêts partagent leur position (quais d'une même gare) : dédupliquer
+   *  évite autant de point-in-polygon. */
+  private async stopPoints(): Promise<StopPointSummary> {
+    const stops = await this.gtfs!.getStops()
+    const seen = new Set<string>()
+    const points: StopPoint[] = []
+    let ignoredStops = 0
+    for (const stop of stops) {
+      const lat = Number(stop.stop_lat)
+      const lon = Number(stop.stop_lon)
+      const valid =
+        Number.isFinite(lat) && Number.isFinite(lon) &&
+        lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 &&
+        !(lat === 0 && lon === 0)
+      if (!valid) {
+        ignoredStops++
+        continue
+      }
+      const key = `${lat},${lon}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      points.push({ lon, lat })
+    }
+    return { totalStops: stops.length, ignoredStops, points }
+  }
+
+  async detectAcademyZone(contours: AcademyContours, zones: ZoneEntry[]): Promise<AcademyZoneReport> {
+    if (!this.gtfs) throw new Error('Aucun GTFS chargé')
+    const summary = await this.stopPoints()
+    return {
+      detection: detectAcademyZone(summary, contours, zones),
+      totalStops: summary.totalStops,
+      ignoredStops: summary.ignoredStops,
+    }
   }
 
   async close(): Promise<void> {

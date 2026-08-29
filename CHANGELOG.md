@@ -2,6 +2,25 @@
 
 ## Upcoming release
 
+- Demo: the school-vacation zone is now detected automatically from the
+  feed's stops. The académie containing the first located stop gives the
+  candidate zone (académie → zone via the school-calendar dataset), then
+  every stop position must fall strictly inside the union of that zone's
+  académies — a single stop outside (cross-border feed, stop beyond the
+  simplified coastline…) and the detection is declined, in line with the
+  library's no-threshold philosophy. Contours come from the official
+  `fr-en-contour-academies-2020` dataset (DGESCO, Licence Ouverte 2.0,
+  ~545 KB gzipped, CORS-enabled), downloaded at first analysis with an
+  embedded fallback (`data/academies.json`, Normandie + La Réunion, loaded
+  only when the API is unreachable). A banner above the Zone/Académie
+  selectors clearly states whether the zone was found automatically — with
+  position counts and the académies covered — or why it was not (positions
+  outside the zone with the neighbouring académies named, feed outside
+  France, no usable coordinates). Touching the selectors switches to manual
+  mode (the detection stays displayed, one click returns to the detected
+  zone), and the public-holiday zone is aligned automatically when the
+  detected académie is an unambiguous overseas one.
+
 - Demo: the public-holiday selector now offers every French zone known to
   date-holidays instead of only mainland France and La Réunion:
   Alsace-Moselle, Guadeloupe, Martinique, Guyane, Mayotte, Saint-Martin,

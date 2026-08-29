@@ -464,6 +464,36 @@ code {
   white-space: nowrap;
 }
 
+/* --- Détection automatique de la zone de vacances ------------------------ */
+.zone-detection {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  margin: 0.6rem 0;
+}
+
+.zone-detection p {
+  margin: 0;
+}
+
+.zone-detection p + p {
+  margin-top: 0.3rem;
+}
+
+.zone-detection.detection-ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.zone-detection.detection-warn {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.zone-detection.detection-neutral {
+  background: #f9fafb;
+}
+
 .badge-ok {
   background: #16a34a;
   color: #fff;
