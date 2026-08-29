@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { CalendarHintsResult, HintResult, Period } from '../../../src/calendar-hints'
-import { buildDayTypes, dayTypeBackground, frLabel, type DayTypeStyle } from '../day-types'
+import { buildDayTypes, dayTypeBackground, frLabel, periodLabel, type DayTypeStyle } from '../day-types'
 import { eachDay, type GeneratedHints } from '../hints'
 import CalendarGrid from './CalendarGrid'
 
@@ -50,7 +50,7 @@ function PeriodCard({ period, style }: { period: Period; style: DayTypeStyle }) 
     <div className="period-card" style={{ borderLeftColor: style.color }}>
       <div className="period-labels">
         <span className="day-type-swatch" style={{ background: dayTypeBackground(style) }} />
-        {period.labels.map(frLabel).join(' + ')}
+        {periodLabel(period.labels)}
       </div>
       <div className="muted">
         {period.days.length} jours ({period.days[0]} → {period.days[period.days.length - 1]}) —{' '}
