@@ -2,6 +2,13 @@
 
 ## Upcoming release
 
+- Demo: new « Sous le capot » section under the results with two collapsible,
+  syntax-highlighted (Prism) snippets: the exact `findCalendarPeriods` call of
+  the current analysis — real hints and options included — as a runnable
+  TypeScript program, and the raw JSON result it returned, pretty-printed
+  with primitive arrays and small objects folded onto single lines. Both come
+  with a copy button.
+
 - Demo: the built-in school-vacation hint now covers Monday to Saturday
   instead of Monday to Friday, and is renamed « Vacances scolaires
   (lun-sam) ». Saturdays inside a vacation period therefore get their own

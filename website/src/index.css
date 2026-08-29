@@ -342,6 +342,94 @@ code {
   }
 }
 
+/* --- Snippets de code (Sous le capot) ------------------------------------ */
+.code-details {
+  margin: 0.5rem 0;
+}
+
+.code-details summary {
+  cursor: pointer;
+  color: #2563eb;
+  font-size: 0.95rem;
+}
+
+.code-wrapper {
+  position: relative;
+  margin-top: 0.4rem;
+}
+
+.code-copy {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.code-copy:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.code-block {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  overflow: auto;
+  max-height: 480px;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.code-block code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Palette claire (inspirée de GitHub Light) pour les tokens Prism */
+.code-block .token.comment {
+  color: #6e7781;
+  font-style: italic;
+}
+
+.code-block .token.string {
+  color: #0a3069;
+}
+
+.code-block .token.property,
+.code-block .token.number {
+  color: #0550ae;
+}
+
+.code-block .token.boolean,
+.code-block .token.null,
+.code-block .token.keyword {
+  color: #cf222e;
+}
+
+.code-block .token.function {
+  color: #8250df;
+}
+
+.code-block .token.class-name,
+.code-block .token.builtin {
+  color: #953800;
+}
+
+.code-block .token.punctuation,
+.code-block .token.operator {
+  color: #57606a;
+}
+
 /* --- Résultats des hints ------------------------------------------------ */
 .hint-result {
   border: 1px solid #e5e7eb;

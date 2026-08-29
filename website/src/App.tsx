@@ -8,7 +8,7 @@ import {
   mobilityDataCsv,
   type GtfsSelectionResult,
 } from 'react-gtfs-selector'
-import type { CalendarHintsResult, SignatureMode } from '../../src/calendar-hints'
+import type { CalendarHintsOptions, CalendarHintsResult, SignatureMode } from '../../src/calendar-hints'
 import type { GtfsWorkerAPI, ProgressInfo, FeedSummary } from './gtfs.worker'
 import { proxyUrl } from './proxy'
 import { PRESETS, type Academy, type HolidayZone, type NetworkPreset } from './presets'
@@ -20,6 +20,7 @@ import {
   DATASET_URL,
   type SchoolCalendar,
 } from './school-calendar'
+import CodeSnippets from './components/CodeSnippets'
 import ResultsView from './components/ResultsView'
 import HintsView from './components/HintsView'
 import HintsEditor from './components/HintsEditor'
@@ -51,6 +52,8 @@ interface Analysis {
   result: CalendarHintsResult
   generated: GeneratedHints
   mode: SignatureMode
+  /** Options réellement passées à `findCalendarPeriods` (pour les snippets). */
+  options: CalendarHintsOptions
   durationMs: number
 }
 
@@ -115,8 +118,9 @@ export default function App() {
         { includeWedSatStart: s.includeWedSatStart },
       )
       // …puis l'analyse complète dans le mode choisi.
-      const result = await worker.analyze(generated.hints, { signatureMode: s.mode, ...clip })
-      setAnalysis({ result, generated, mode: s.mode, durationMs: performance.now() - started })
+      const options: CalendarHintsOptions = { signatureMode: s.mode, ...clip }
+      const result = await worker.analyze(generated.hints, options)
+      setAnalysis({ result, generated, mode: s.mode, options, durationMs: performance.now() - started })
       setPhase({ kind: 'ready', label: loaded.label, summary: loaded.summary })
     } catch (e) {
       setPhase({ kind: 'error', label: loaded.label, message: e instanceof Error ? e.message : String(e) })
@@ -393,6 +397,12 @@ export default function App() {
             <HintsView generated={analysis.generated} />
           </section>
           <ResultsView result={analysis.result} generated={analysis.generated} />
+          <CodeSnippets
+            generated={analysis.generated}
+            options={analysis.options}
+            result={analysis.result}
+            feedLabel={phase.label}
+          />
         </>
       )}
     </div>
