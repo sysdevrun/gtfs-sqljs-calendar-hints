@@ -23,6 +23,61 @@ export function frLabel(label: string): string {
   return LABEL_FR.reduce((s, [en, fr]) => s.replaceAll(en, fr), label)
 }
 
+// Libellé d'une période : les labels « Hint — Mondays + Hint — Tuesdays + … »
+// issus de la politique per-day-of-week sont regroupés par hint, et les jours
+// consécutifs condensés en « du lundi au samedi ». Semaine à la française,
+// lundi en tête.
+const WEEKDAYS_EN = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays']
+const WEEKDAYS_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+
+function frWeekdays(indices: number[]): string {
+  const sorted = [...new Set(indices)].sort((a, b) => a - b)
+  const runs: number[][] = []
+  for (const i of sorted) {
+    const run = runs[runs.length - 1]
+    if (run && i === run[run.length - 1] + 1) run.push(i)
+    else runs.push([i])
+  }
+  return runs
+    .map(run => {
+      if (run.length === 7) return 'tous les jours'
+      if (run.length >= 3) return `du ${WEEKDAYS_FR[run[0]]} au ${WEEKDAYS_FR[run[run.length - 1]]}`
+      return run.map(i => `${WEEKDAYS_FR[i]}s`).join(' + ')
+    })
+    .join(' + ')
+}
+
+export function periodLabel(labels: string[]): string {
+  // Groupes dans l'ordre de première apparition ; ceux issus d'un même hint
+  // per-day-of-week (même préfixe avant « — jour ») fusionnent leurs jours.
+  const groups: { prefix: string | null; weekdays: number[] }[] = []
+  const byPrefix = new Map<string, { prefix: string | null; weekdays: number[] }>()
+  for (const label of labels) {
+    const sep = label.lastIndexOf(' — ')
+    const weekday = sep >= 0 ? WEEKDAYS_EN.indexOf(label.slice(sep + 3)) : -1
+    if (weekday < 0) {
+      groups.push({ prefix: frLabel(label), weekdays: [] })
+      continue
+    }
+    // « Remaining days — lundis » s'affiche sans préfixe, comme frLabel
+    const prefix = label.slice(0, sep) === 'Remaining days' ? null : frLabel(label.slice(0, sep))
+    let group = byPrefix.get(prefix ?? '')
+    if (!group) {
+      group = { prefix, weekdays: [] }
+      byPrefix.set(prefix ?? '', group)
+      groups.push(group)
+    }
+    group.weekdays.push(weekday)
+  }
+  return groups
+    .map(g => {
+      if (g.weekdays.length === 0) return g.prefix
+      const days = frWeekdays(g.weekdays)
+      return g.prefix === null ? days : `${g.prefix} : ${days}`
+    })
+    .join(' + ')
+}
+
 // Palette stable ; quand elle boucle, le motif change — 12 × 4 = 48 styles
 // distincts avant répétition, largement au-delà du nombre de signatures d'un
 // feed réel.
@@ -110,7 +165,7 @@ export function buildDayTypes(result: CalendarHintsResult, orderedPeriods: Perio
     return {
       signature,
       style: styleOf(i),
-      label: period ? period.labels.map(frLabel).join(' + ') : 'non classé',
+      label: period ? periodLabel(period.labels) : 'non classé',
       dayCount: dayCounts.get(signature) ?? 0,
       unclassifiedCount: group?.days.length ?? 0,
       tripCount: period?.tripCount ?? group?.tripCount ?? 0,

@@ -2,6 +2,11 @@
 
 ## Upcoming release
 
+- Demo: period labels now group the per-day-of-week entries of a hint and
+  condense consecutive weekdays into a range, e.g. « Vacances scolaires
+  (lun-sam) : du lundi au samedi + samedis » instead of one « … — lundis »
+  entry per weekday. Applies to the period cards and the calendar legend.
+
 - Demo: new « Sous le capot » section under the results with two collapsible,
   syntax-highlighted (Prism) snippets: the exact `findCalendarPeriods` call of
   the current analysis — real hints and options included — as a runnable
