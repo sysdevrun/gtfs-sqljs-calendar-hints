@@ -2,6 +2,27 @@
 
 ## Upcoming release
 
+- Demo: the public-holiday zone is now detected automatically from the
+  feed's stops too. Holiday regimes follow départements, not académies
+  (Nancy-Metz mixes Moselle's local regime with the general one), so the
+  detection classifies every stop position against the 14 territories with
+  specific holidays — départements 57/67/68 for Alsace-Moselle and each
+  DOM/COM, including the French part of Saint-Martin and the Pacific
+  collectivities absent from the académie contours — embedded from the
+  Etalab administrative contours (Admin Express IGN, Licence Ouverte,
+  `data/holiday-territories.json`, 39 KB, no runtime fetch). Every stop
+  located in France must fall under the same regime, otherwise the
+  detection is declined with the per-regime counts (e.g. a network
+  straddling Nancy and Metz); stops outside France are ignored — a tram to
+  Kehl or Basel carries no French holidays, and border networks are
+  precisely the Alsace-Moselle ones. A banner under the holiday selector
+  states the outcome; touching the selector switches to manual with one
+  click back. Replaces the académie-based overseas mapping, which could
+  not see Alsace-Moselle (Soléa in Mulhouse now gets Vendredi saint and
+  26 décembre automatically), Saint-Martin, Saint-Barthélemy or the
+  Pacific. Checked against real feeds: Soléa → Alsace-Moselle, Twisto
+  (Caen) → mainland, Car Jaune → La Réunion.
+
 - Demo: the school-vacation zone is now detected automatically from the
   feed's stops. The académie containing the first located stop gives the
   candidate zone (académie → zone via the school-calendar dataset), then

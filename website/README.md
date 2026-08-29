@@ -17,6 +17,11 @@ directement dans le navigateur :
   académies de la zone — un bandeau indique clairement si la zone a été
   trouvée (et pourquoi sinon), les sélecteurs Zone/Académie permettant de
   reprendre la main ;
+- la **zone de jours fériés est détectée automatiquement** elle aussi, par
+  départements (57/67/68 = Alsace-Moselle) et territoires ultramarins —
+  contours administratifs Etalab embarqués (`data/holiday-territories.json`),
+  arrêts hors de France ignorés (tram vers Kehl ou Bâle), détection refusée
+  si le réseau chevauche plusieurs régimes ;
 - les hints (jours fériés de toutes les zones françaises — métropole,
   Alsace-Moselle, chaque DROM/COM —, vacances scolaires des académies
   Réunion et Normandie via l'API `data.education.gouv.fr`, avec repli sur

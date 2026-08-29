@@ -16,6 +16,11 @@ import {
   type StopPoint,
   type StopPointSummary,
 } from './academies'
+import {
+  detectHolidayZone,
+  type HolidayDetection,
+  type TerritoryContour,
+} from './holiday-zones'
 import type { ZoneEntry } from './school-calendar'
 
 export interface ProgressInfo {
@@ -36,12 +41,19 @@ export interface GtfsWorkerAPI {
   loadFromData(data: ArrayBuffer, onProgress: (p: ProgressInfo) => void): Promise<FeedSummary>
   analyze(hints: Hint[], options: CalendarHintsOptions): Promise<CalendarHintsResult>
   detectAcademyZone(contours: AcademyContours, zones: ZoneEntry[]): Promise<AcademyZoneReport>
+  detectHolidayZone(territories: TerritoryContour[], academies: AcademyContours): Promise<HolidayZoneReport>
   close(): Promise<void>
 }
 
 /** Détection + comptages des positions, pour l'affichage côté UI. */
 export interface AcademyZoneReport {
   detection: AcademyDetection
+  totalStops: number
+  ignoredStops: number
+}
+
+export interface HolidayZoneReport {
+  detection: HolidayDetection
   totalStops: number
   ignoredStops: number
 }
@@ -63,6 +75,8 @@ async function makeAdapter() {
 
 class GtfsWorker implements GtfsWorkerAPI {
   private gtfs: GtfsSqlJs | null = null
+  /** Positions extraites une seule fois par feed, partagées entre détections. */
+  private points: Promise<StopPointSummary> | null = null
 
   private async summarize(): Promise<FeedSummary> {
     const agencies = await this.gtfs!.getAgencies()
@@ -110,7 +124,11 @@ class GtfsWorker implements GtfsWorkerAPI {
    *  n'est pas « hors académies » parce qu'un arrêt est mal saisi. Beaucoup
    *  d'arrêts partagent leur position (quais d'une même gare) : dédupliquer
    *  évite autant de point-in-polygon. */
-  private async stopPoints(): Promise<StopPointSummary> {
+  private stopPoints(): Promise<StopPointSummary> {
+    return (this.points ??= this.computeStopPoints())
+  }
+
+  private async computeStopPoints(): Promise<StopPointSummary> {
     const stops = await this.gtfs!.getStops()
     const seen = new Set<string>()
     const points: StopPoint[] = []
@@ -144,7 +162,21 @@ class GtfsWorker implements GtfsWorkerAPI {
     }
   }
 
+  async detectHolidayZone(
+    territories: TerritoryContour[],
+    academies: AcademyContours,
+  ): Promise<HolidayZoneReport> {
+    if (!this.gtfs) throw new Error('Aucun GTFS chargé')
+    const summary = await this.stopPoints()
+    return {
+      detection: detectHolidayZone(summary, territories, academies),
+      totalStops: summary.totalStops,
+      ignoredStops: summary.ignoredStops,
+    }
+  }
+
   async close(): Promise<void> {
+    this.points = null
     if (this.gtfs) {
       await this.gtfs.close()
       this.gtfs = null
