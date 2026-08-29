@@ -20,7 +20,9 @@ import {
   DATASET_URL,
   type SchoolCalendar,
 } from './school-calendar'
+import { loadAcademyContours } from './academies'
 import CodeSnippets from './components/CodeSnippets'
+import ZoneDetection, { type ZoneDetectionState } from './components/ZoneDetection'
 import ResultsView from './components/ResultsView'
 import HintsView from './components/HintsView'
 import HintsEditor from './components/HintsEditor'
@@ -57,6 +59,18 @@ interface Analysis {
   durationMs: number
 }
 
+// Académies ultramarines : la zone de fériés date-holidays correspondante est
+// sans ambiguïté — elle est alignée automatiquement avec la zone de vacances
+// détectée. En métropole le choix (métropole vs Alsace-Moselle) reste à
+// l'utilisateur : l'académie de Nancy-Metz mélange les deux régimes.
+const DOM_HOLIDAY_ZONES: Partial<Record<Academy, HolidayZone>> = {
+  Guadeloupe: 'guadeloupe',
+  Martinique: 'martinique',
+  Guyane: 'guyane',
+  'Réunion': 'reunion',
+  Mayotte: 'mayotte',
+}
+
 type Phase =
   | { kind: 'idle' }
   | { kind: 'loading'; label: string; progress: ProgressInfo | null }
@@ -72,6 +86,16 @@ export default function App() {
   const [calendar, setCalendar] = useState<SchoolCalendar | null>(null)
   const [calendarLoading, setCalendarLoading] = useState(false)
   const summaryRef = useRef<{ label: string; summary: FeedSummary } | null>(null)
+  const [detection, setDetection] = useState<ZoneDetectionState | null>(null)
+  // `auto` : la zone détectée s'applique à chaque analyse ; toucher aux
+  // sélecteurs Zone/Académie passe en `manuel` (la détection reste affichée).
+  const academyModeRef = useRef<'auto' | 'manual'>('auto')
+  const [academySource, setAcademySource] = useState<'auto' | 'manual'>('auto')
+
+  const setAcademyMode = useCallback((mode: 'auto' | 'manual') => {
+    academyModeRef.current = mode
+    setAcademySource(mode)
+  }, [])
 
   // `loadSchoolCalendar` garde l'export en cache : le bouton ne fait que
   // déclencher explicitement ce que l'analyse ferait de toute façon.
@@ -109,9 +133,34 @@ export default function App() {
       // …qui permet de générer les hints (fériés + vacances scolaires)…
       const schoolCalendar = await loadSchoolCalendar()
       setCalendar(schoolCalendar)
+      // Détection automatique de la zone de vacances : académie du premier
+      // arrêt localisé → zone → tous les arrêts dans les académies de la zone
+      // (cf. academies.ts). Appliquée sauf réglage manuel ; son échec
+      // n'empêche jamais l'analyse (les réglages courants font foi).
+      let academy = s.academy
+      let holidayZone = s.zone
+      try {
+        const contours = await loadAcademyContours()
+        const report = await worker.detectAcademyZone(contours, schoolCalendar.zones)
+        setDetection({
+          kind: 'report',
+          report,
+          source: contours.source,
+          ...(contours.error ? { sourceError: contours.error } : {}),
+        })
+        if (report.detection.status === 'detected' && academyModeRef.current === 'auto') {
+          academy = report.detection.academy
+          holidayZone = DOM_HOLIDAY_ZONES[academy] ?? s.zone
+          if (academy !== s.academy || holidayZone !== s.zone) {
+            setSettings(prev => ({ ...prev, academy, zone: holidayZone }))
+          }
+        }
+      } catch (e) {
+        setDetection({ kind: 'failed', message: e instanceof Error ? e.message : String(e) })
+      }
       const generated = await generateHints(
-        s.zone,
-        recordsForLocation(schoolCalendar, s.academy),
+        holidayZone,
+        recordsForLocation(schoolCalendar, academy),
         probe.firstDay,
         probe.lastDay,
         s.hintConfigs,
@@ -135,6 +184,8 @@ export default function App() {
     const worker = getWorker()
     setSettings(nextSettings)
     setAnalysis(null)
+    setDetection(null)
+    setAcademyMode('auto') // nouveau feed : la détection reprend la main
     summaryRef.current = null
     setPhase({ kind: 'loading', label, progress: null })
     try {
@@ -146,7 +197,7 @@ export default function App() {
     } catch (e) {
       setPhase({ kind: 'error', label, message: e instanceof Error ? e.message : String(e) })
     }
-  }, [getWorker, runAnalysis])
+  }, [getWorker, runAnalysis, setAcademyMode])
 
   const loadPreset = useCallback((preset: NetworkPreset) => {
     void loadAndAnalyze(
@@ -193,8 +244,31 @@ export default function App() {
   const zoneLocations = calendar?.zones.find(z => z.zone === schoolZone)?.locations ?? []
   const selectSchoolZone = useCallback((zone: string) => {
     const first = calendar?.zones.find(z => z.zone === zone)?.locations[0]
-    if (first) updateSetting('academy', first)
-  }, [calendar, updateSetting])
+    if (first) {
+      setAcademyMode('manual')
+      updateSetting('academy', first)
+    }
+  }, [calendar, updateSetting, setAcademyMode])
+
+  const selectAcademy = useCallback((academy: Academy) => {
+    setAcademyMode('manual')
+    updateSetting('academy', academy)
+  }, [updateSetting, setAcademyMode])
+
+  const useDetectedAcademy = useCallback((academy: Academy) => {
+    setAcademyMode('auto')
+    updateSetting('academy', academy)
+  }, [updateSetting, setAcademyMode])
+
+  // Libellé de fériés à mentionner dans le bandeau de détection quand il a été
+  // aligné automatiquement (académie ultramarine détectée, mode auto).
+  const detectedHolidayLabel =
+    academySource === 'auto' &&
+    detection?.kind === 'report' &&
+    detection.report.detection.status === 'detected' &&
+    DOM_HOLIDAY_ZONES[detection.report.detection.academy] === settings.zone
+      ? HOLIDAY_ZONES.find(z => z.id === settings.zone)?.label
+      : undefined
 
   return (
     <div className="app">
@@ -316,6 +390,14 @@ export default function App() {
                 </>
               )}
             </p>
+            {detection && (
+              <ZoneDetection
+                state={detection}
+                academySource={academySource}
+                holidayZoneLabel={detectedHolidayLabel}
+                onUseDetected={useDetectedAcademy}
+              />
+            )}
             <div className="settings-row">
               <label>
                 Zone
@@ -332,16 +414,19 @@ export default function App() {
               <label>
                 Académie
                 <select value={settings.academy} disabled={busy || zoneLocations.length <= 1}
-                  onChange={e => updateSetting('academy', e.target.value as Academy)}>
+                  onChange={e => selectAcademy(e.target.value as Academy)}>
                   {zoneLocations.length === 0 && <option value={settings.academy}>{settings.academy}</option>}
                   {zoneLocations.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </label>
             </div>
             <p className="small muted">
-              Toutes les académies d'une même zone partagent les mêmes dates — le choix
-              ne change que l'étiquette, sauf pour les zones ultramarines qui ont leur
-              propre calendrier.
+              La zone est détectée automatiquement à l'analyse — académie du premier arrêt,
+              puis vérification que tous les arrêts du feed sont dans les académies de sa
+              zone (contours officiels des académies). Modifier les sélecteurs reprend la
+              main. Toutes les académies d'une même zone partagent les mêmes dates — le
+              choix ne change que l'étiquette, sauf pour les zones ultramarines qui ont
+              leur propre calendrier.
             </p>
           </div>
         )}
