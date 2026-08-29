@@ -24,9 +24,10 @@ export function frLabel(label: string): string {
 }
 
 // Libellé d'une période : les labels « Hint — Mondays + Hint — Tuesdays + … »
-// issus de la politique per-day-of-week sont regroupés par hint, et les jours
-// consécutifs condensés en « du lundi au samedi ». Semaine à la française,
-// lundi en tête.
+// issus de la politique per-day-of-week sont regroupés par hint — les jours
+// d'abord, le nom du hint entre parenthèses : « Du lundi au samedi (Vacances
+// scolaires) » — et les jours consécutifs condensés en « du … au … ».
+// Semaine à la française, lundi en tête.
 const WEEKDAYS_EN = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays']
 const WEEKDAYS_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 
@@ -69,13 +70,14 @@ export function periodLabel(labels: string[]): string {
     }
     group.weekdays.push(weekday)
   }
-  return groups
+  const label = groups
     .map(g => {
       if (g.weekdays.length === 0) return g.prefix
       const days = frWeekdays(g.weekdays)
-      return g.prefix === null ? days : `${g.prefix} : ${days}`
+      return g.prefix === null ? days : `${days} (${g.prefix})`
     })
     .join(' + ')
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 // Palette stable ; quand elle boucle, le motif change — 12 × 4 = 48 styles
